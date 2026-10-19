@@ -25,7 +25,7 @@
 <header class="app-header">
  <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Disk Atlas</div>
  <nav class="navigation" aria-label="Ana gezinme"><button class="nav-btn active" data-view="explorer" aria-current="page">Keşfet</button><button class="nav-btn hidden" id="appsNav" data-view="apps">Uygulamalar</button><button class="nav-btn hidden" id="unrecognizedNav" data-view="unrecognized">Tanınmayan</button><button class="nav-btn" data-view="files">Büyük dosyalar</button><button class="nav-btn hidden" id="historyNav" data-view="history">Geçmiş</button><button class="nav-btn" data-view="health">Tarama bilgisi</button></nav>
- <div class="header-end"><span class="read-only"><svg><use href="#i-shield"/></svg>Salt okunur</span><button class="button dark hidden" id="scanBtn">Tara</button><button class="button" id="importBtn"><svg><use href="#i-import"/></svg>Rapor aç</button></div>
+ <div class="header-end"><span class="read-only"><svg><use href="#i-shield"/></svg><span id="modeBadgeText">Salt okunur</span></span><button class="button dark hidden" id="scanBtn">Tara</button><button class="button" id="importBtn"><svg><use href="#i-import"/></svg>Rapor aç</button></div>
 </header>
 <main class="main">
  <div class="intro"><div><div class="eyebrow">MAC DEPOLAMA ANALİZİ / YEREL RAPOR</div><h1>Diskinin büyük resmi.</h1><p>Neyin ne kadar yer kapladığını gör. Ayrıntıları keşfet.</p></div><div class="stamp"><strong id="scanDate">Henüz tarama verisi yok</strong><span id="scanMeta">Verilerin bu cihazda kalır.</span></div></div>
@@ -67,7 +67,7 @@
   <div class="panel apps-panel"><div class="panel-top"><div><h2 class="panel-title">Uygulamalar</h2><p class="panel-subtitle">Büyük alanlar, ait oldukları araç ve uygulamalarla gruplandı. Bir satırı açıp ne olduğunu, neden bu türde sayıldığını ve silinirse ne olacağını oku.</p></div><span id="appsCount" class="count-pill"></span></div>
    <div class="searchbar"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="appsSearch" type="search" placeholder="Araç, uygulama veya klasör ara…" aria-label="Uygulamalarda ara"></div>
    <div id="appsList" class="apps-list"></div>
-   <p class="footnote apps-note">Eşleştirme klasör adına ve yoluna göredir; dosya içerikleri okunmaz. Açıklamalar genel bilgidir ve her Mac’te geçerli olmayabilir. Güvenlik rozetleri yalnızca bilgidir; bu sürümde hiçbir şey silinmez.</p></div>
+   <p class="footnote apps-note">Eşleştirme klasör adına ve yoluna göredir; dosya içerikleri okunmaz. Açıklamalar genel bilgidir ve her Mac’te geçerli olmayabilir. Güvenlik rozetleri yalnızca bilgidir. Uygulamada seçip onayladığın öğeler Çöp Sepeti’ne taşınır; rapor dosyası açıkken hiçbir şey taşınmaz.</p></div>
  </section>
  <section id="view-unrecognized" class="view hidden">
   <div class="panel files-panel"><div class="panel-top"><div><h2 class="panel-title">Tanınmayan büyük klasörler</h2><p class="panel-subtitle">Hiçbir araç kuralına girmeyen, kendi payı büyük klasörler. Kendi payı, alt klasörleri çıkarıldıktan sonra kalan boyuttur.</p></div><span id="unrecognizedCount" class="count-pill"></span></div>
@@ -87,7 +87,9 @@
  </section>
  <section id="view-health" class="view hidden"><div class="health-layout"><section class="panel health-panel"><h2>Ölçümün sınırlarını bil.</h2><p id="healthSummary"></p><div id="healthMetrics" class="health-metrics"></div><p id="appInfoText" class="footnote"></p></section><section class="panel health-panel"><h2>Görünen alan, bütün disk değildir.</h2><ul class="limits"><li>Dosya içerikleri açılmadı; yalnızca ad, yol ve boyut metaverileri ölçüldü.</li><li>Sembolik bağlantılar ve farklı disk birimleri izlenmedi. Bulut dosyaları indirilmedi.</li><li>Korumalı alanlar ve APFS anlık görüntüleri kapsam dışındadır.</li><li>Sabit bağlantılar bir kez sayıldı. APFS klonlarının ortak blokları tekrar sayılabilir.</li><li>Önbellek ve diğer türler dosya yoluna göre tahmindir. Gereksizlik veya kesin kazanım doğrulanmadı.</li><li>GB = 1.000.000.000 bayt (macOS ile aynı birim). Kullanılabilir alan tarama anının ölçümüdür.</li></ul><div id="errorList" class="error-list"></div></section></div></section>
  </div>
- <footer class="app-footer"><span class="footer-status"><i class="status-dot"></i>Yalnızca gözlem. Silme, taşıma veya temizlik işlemi yok.</span><div class="footer-actions"><button id="coverageBtn">Tarama kapsamı</button><button id="helpBtn">Nasıl çalışır?</button></div></footer>
+ <div id="cleanupBar" class="cleanup-bar hidden" role="region" aria-label="Çöp Sepeti’ne taşıma"><div class="cleanup-summary"><strong id="cleanupSize">0 B</strong><span id="cleanupCount">0 öğe seçildi</span></div><div class="cleanup-actions"><button id="cleanupClear" class="text-button">Seçimi temizle</button><button id="cleanupBtn" class="button dark" disabled>Çöp Sepeti’ne taşı…</button></div></div>
+ <div id="staleBar" class="cleanup-bar stale hidden" role="status"><div class="cleanup-summary"><strong>Bu tarama güncel değil.</strong><span>Öğeler taşındı; sayılar eskidi. Yeni bir tarama yapana kadar taşıma kapalıdır.</span></div><div class="cleanup-actions"><button id="staleRescan" class="button dark">Yeniden tara</button></div></div>
+ <footer class="app-footer"><span class="footer-status"><i class="status-dot"></i><span id="footerStatusText">Yalnızca gözlem. Silme, taşıma veya temizlik işlemi yok.</span></span><div class="footer-actions"><button id="coverageBtn">Tarama kapsamı</button><button id="helpBtn">Nasıl çalışır?</button></div></footer>
 </main>
 </div>
 <input id="fileInput" type="file" accept=".json,application/json" hidden>

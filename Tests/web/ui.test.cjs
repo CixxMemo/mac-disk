@@ -18,7 +18,7 @@ test('native boot shows the welcome screen and permission card when there are no
   assert(!visible(env, 'openSettingsBtn'));
   assert(!visible(env, 'dashboard'));
   assert(env.get('appInfoText').textContent.includes('0.2.0') && env.get('appInfoText').textContent.includes('15.7'));
-  assert.deepEqual(bridge.calls.map(c => c.type).sort(), ['appInfo', 'listScans', 'permissionStatus']);
+  assert.deepEqual(bridge.calls.map(c => c.type).sort(), ['appInfo', 'capabilities', 'listScans', 'permissionStatus']);
 });
 
 test('native boot opens the newest saved scan', async () => {
@@ -466,4 +466,173 @@ test('a malformed apps section is rejected instead of crashing later', () => {
     assert.throws(() => env.run(`validate(${JSON.stringify(makeReport({ apps: bad }))})`), /uygulama/i);
   }
   assert.doesNotThrow(() => env.run(`validate(${JSON.stringify(makeReport({ apps: makeApps() }))})`));
+});
+
+// ---- Aşama 5: Çöp Sepeti'ne taşıma ----
+const cleanupApps = () => {
+  const apps = makeApps();
+  apps.apps[0].components.push({ id: 'sub', name: 'Alt klasör', bytes: 1e9, paths: ['/Users/test/Library/sub'], safety: 'güvenli', category: 'cache', what: 'x nedir', why: 'y neden', ifRemoved: 'z olur' });
+  apps.apps[1].components.push({ id: 'docs', name: 'Belgeler', bytes: 1e9, paths: ['/Users/test/Documents'], safety: 'asla', category: 'personal', what: 'x nedir', why: 'y neden', ifRemoved: 'z olur' });
+  return apps;
+};
+const finding = (name, path, bytes, safety, group) => ({ name, path, bytes, category: 'cache', group, note: 'not', safety });
+const cleanupEnv = async (handlers = {}, { cleanup = true } = {}) => nativeEnv({
+  ...(cleanup ? { capabilities: () => ({ cleanup: true }) } : {}),
+  listScans: () => [{ id: 'scan-1' }],
+  loadScan: () => makeReport({ apps: cleanupApps(), ui: { homePath: '/Users/test', findings: [
+    finding('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli', 'cache'), finding('Android SDK', '/Users/test/Library', 3e9, 'incele', 'review')] } }),
+  ...handlers
+});
+const checkboxes = (env, id) => env.get(id).querySelectorAll('input').filter(n => n.type === 'checkbox');
+const tick = (box, on = true) => { box.checked = on; box.onchange(); };
+const plan = (items, extra = {}) => ({ planId: 'p1', items, totalBytes: items.filter(i => i.status === 'accepted').reduce((s, i) => s + i.bytes, 0),
+  needsAcknowledge: items.some(i => i.status === 'accepted' && i.safety === 'incele'), acceptedCount: items.filter(i => i.status === 'accepted').length, ...extra });
+const acceptedItem = (name, path, bytes, safety) => ({ name, path, bytes, safety, status: 'accepted' });
+
+test('without the cleanup capability nothing can be moved and the badge stays read-only', async () => {
+  const { env } = await cleanupEnv({}, { cleanup: false });
+  tick(checkboxes(env, 'findingsList')[0]);
+  assert(!visible(env, 'cleanupBar'));
+  assert.equal(env.get('modeBadgeText').textContent, 'Salt okunur');
+  await env.get('appsNav').click(); await settle();
+  assert.equal(checkboxes(env, 'appsList').length, 0);
+});
+
+test('with cleanup the badge changes and the bar follows the selection', async () => {
+  const { env } = await cleanupEnv();
+  assert.equal(env.get('modeBadgeText').textContent, 'Silme: yalnızca Çöp Sepeti');
+  assert(!visible(env, 'cleanupBar'));
+  tick(checkboxes(env, 'findingsList')[0]);
+  assert(visible(env, 'cleanupBar'));
+  assert.equal(env.get('cleanupSize').textContent, '2,00 GB');   // önbellek grubu önce listelenir
+  assert(env.get('cleanupCount').textContent.includes('1 öğe'));
+  tick(checkboxes(env, 'findingsList')[0], false);
+  assert(!visible(env, 'cleanupBar'));
+});
+
+test('file mode never offers cleanup', () => {
+  const env = boot(); env.run(`load(${JSON.stringify(makeReport({ ui: { homePath: '/Users/test', findings: [finding('x', '/Users/test/.npm', 2e9, 'güvenli', 'cache')] } }))})`);
+  tick(checkboxes(env, 'findingsList')[0]);
+  assert(!visible(env, 'cleanupBar'));
+  assert.equal(env.get('modeBadgeText').textContent, '', 'dosya kipinde rozet metnine dokunulmaz');
+  assert(env.html.includes('<span id="modeBadgeText">Salt okunur</span>'));
+});
+
+test('apps tab offers checkboxes only for paths that are not protected', async () => {
+  const { env } = await cleanupEnv();
+  await env.get('appsNav').click(); await settle();
+  // Android SDK, Sanal cihazlar, Alt klasör, npm önbelleği; "Belgeler" (asla) yok.
+  assert.equal(checkboxes(env, 'appsList').length, 4);
+  assert(!env.get('appsList').textContent.includes('Belgeler') || checkboxes(env, 'appsList').length === 4);
+});
+
+test('selections from both lists share one bar and nested folders are counted once', async () => {
+  const { env } = await cleanupEnv();
+  await env.get('appsNav').click(); await settle();
+  const boxes = checkboxes(env, 'appsList');
+  const labels = boxes.map(b => b.attrs['aria-label']);
+  const pick = text => boxes[labels.findIndex(l => l.includes(text))];
+  tick(pick('npm önbelleği'));
+  assert(env.get('cleanupCount').textContent.includes('1 öğe'));
+  tick(pick('Alt klasör'));                                  // /Users/test/Library/sub
+  tick(checkboxes(env, 'findingsList')[1]);                  // /Users/test/Library (üst klasör)
+  assert(env.get('cleanupCount').textContent.includes('2 öğe'), env.get('cleanupCount').textContent);
+  assert.equal(env.get('cleanupSize').textContent, '5,00 GB');
+});
+
+test('opening the plan sends only the scan id and the selected paths', async () => {
+  const { env, bridge } = await cleanupEnv({ planTrash: () => plan([acceptedItem('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli')]) });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  assert.deepEqual(bridge.calls.find(c => c.type === 'planTrash').payload, { scanId: 'scan-1', paths: ['/Users/test/.npm'] });
+  assert(visible(env, 'dialogBackdrop'));
+});
+
+test('the plan dialog explains the move, lists rejections and needs an acknowledgement for review items', async () => {
+  const items = [acceptedItem('Android SDK', '/Users/test/Library', 3e9, 'incele'),
+    { name: 'Belgeler', path: '/Users/test/Documents', bytes: 0, status: 'rejected', reason: 'Kişisel veya gizli bir klasör' }];
+  const { env, bridge } = await cleanupEnv({ planTrash: () => plan(items), confirmTrash: () => ({ results: [{ path: '/Users/test/Library', ok: true, trashedTo: '/Users/test/.Trash/Library' }], movedBytes: 3e9, failedCount: 0 }) });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  const text = env.get('dialogBody').textContent;
+  for (const expected of ['Android SDK', '3,00 GB', 'Belgeler', 'Kişisel veya gizli bir klasör', 'yer açılmaz', 'Çöp Sepeti']) assert(text.includes(expected), expected);
+  const [box] = checkboxes(env, 'dialogBody');
+  const buttons = env.get('dialogBody').querySelectorAll('button');
+  const confirm = buttons.at(-1);
+  assert(confirm.disabled, 'ek onay olmadan pasif');
+  tick(box);
+  assert(!confirm.disabled);
+  await confirm.click(); await settle();
+  assert.deepEqual(bridge.calls.find(c => c.type === 'confirmTrash').payload, { planId: 'p1', acknowledgeReview: true });
+});
+
+test('a safe-only plan needs no acknowledgement box', async () => {
+  const { env } = await cleanupEnv({ planTrash: () => plan([acceptedItem('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli')]) });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  assert.equal(checkboxes(env, 'dialogBody').length, 0);
+  assert(!env.get('dialogBody').querySelectorAll('button').at(-1).disabled);
+});
+
+test('a plan with nothing acceptable cannot be confirmed', async () => {
+  const { env } = await cleanupEnv({ planTrash: () => plan([{ name: 'x', path: '/Users/test/.npm', bytes: 0, status: 'rejected', reason: 'Öğe artık yok.' }]) });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  assert(env.get('dialogBody').querySelectorAll('button').at(-1).disabled);
+});
+
+test('after a successful move the result is shown, the scan becomes stale and cleanup closes', async () => {
+  const results = [{ path: '/Users/test/.npm', ok: true, trashedTo: '/Users/test/.Trash/.npm' }, { path: '/Users/test/Library/sub', ok: false, reason: 'Taşınamadı: izin yok' }];
+  const { env } = await cleanupEnv({ planTrash: () => plan([acceptedItem('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli')]), confirmTrash: () => ({ results, movedBytes: 2e9, failedCount: 1 }) });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  await env.get('dialogBody').querySelectorAll('button').at(-1).click(); await settle();
+  const text = env.get('dialogBody').textContent;
+  for (const expected of ['2,00 GB', 'Taşındı', 'Taşınamadı: izin yok', 'Geri Koy']) assert(text.includes(expected), expected);
+  assert(visible(env, 'staleBar') && !visible(env, 'cleanupBar'));
+  assert.equal(checkboxes(env, 'findingsList').filter(b => b.checked).length, 0);
+  await env.get('appsNav').click(); await settle();
+  assert.equal(checkboxes(env, 'appsList').length, 0, 'bayat taramada seçim kutusu yok');
+});
+
+test('a run where nothing moved keeps the scan fresh', async () => {
+  const { env } = await cleanupEnv({ planTrash: () => plan([acceptedItem('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli')]),
+    confirmTrash: () => ({ results: [{ path: '/Users/test/.npm', ok: false, reason: 'Plandan sonra değişti' }], movedBytes: 0, failedCount: 1 }) });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  await env.get('dialogBody').querySelectorAll('button').at(-1).click(); await settle();
+  assert(!visible(env, 'staleBar'));
+});
+
+test('the stale bar offers a rescan', async () => {
+  const { env, bridge } = await cleanupEnv({ startScan: () => ({ started: true }), planTrash: () => plan([acceptedItem('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli')]),
+    confirmTrash: () => ({ results: [{ path: '/Users/test/.npm', ok: true }], movedBytes: 2e9, failedCount: 0 }) });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  await env.get('dialogBody').querySelectorAll('button').at(-1).click(); await settle();
+  await env.get('staleRescan').click(); await settle();
+  assert(bridge.calls.some(c => c.type === 'startScan'));
+  assert(!visible(env, 'staleBar'));
+});
+
+test('cleanup is closed while a scan runs', async () => {
+  const { env } = await cleanupEnv({ startScan: () => ({ started: true }) });
+  tick(checkboxes(env, 'findingsList')[0]);
+  assert(visible(env, 'cleanupBar'));
+  await env.get('scanBtn').click(); await settle();
+  assert(!visible(env, 'cleanupBar'));
+});
+
+test('a plan error is shown to the user and nothing is confirmed', async () => {
+  const { env, bridge } = await cleanupEnv({ planTrash: () => { throw new Error('Tarama sürerken temizlik yapılamaz.'); } });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  assert(env.get('message').textContent.includes('Tarama sürerken'));
+  assert(!bridge.calls.some(c => c.type === 'confirmTrash'));
+});
+
+test('findings with an unknown safety level are rejected', () => {
+  const env = boot();
+  const bad = makeReport({ ui: { homePath: '/Users/test', findings: [finding('x', '/Users/test/.npm', 2e9, 'sil', 'cache')] } });
+  assert.throws(() => env.run(`load(${JSON.stringify(bad)})`), /geçersiz/i);
 });

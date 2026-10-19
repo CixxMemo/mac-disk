@@ -4,6 +4,7 @@ const tones = {personal:{name:'Kişisel dosyalar',color:'#fae9db'},dev:{name:'Ge
 const sourceCategories = ['cache','build','dependencies','models','personal','system'];
 let data = null, index = new Map(), ancestors = new Map(), home = null, current = null, mode = 'folders', activeView = 'explorer', selected = new Set(), findings = [], previousFocus = null, toastTimer = null;
 const element = (tag,cls,text) => {const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;};
+let cleanable=new Map(),currentScanId=null,pendingScanId=null,cleanupEnabled=false,staleScan=false,cleaning=false;
 function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#i-'+name);svg.append(use);svg.setAttribute('aria-hidden','true');return svg;}
 function amount(value){if(!Number.isFinite(value)||value<0)return ['—',''];if(value<1000)return [String(value),'B'];const units=['KB','MB','GB','TB','PB'];let i=-1;do{value/=1000;i++;}while(value>=1000&&i<units.length-1);const digits=i>=2?2:1;return [new Intl.NumberFormat('tr-TR',{maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value),units[i]];}
 const format = value => amount(value).join(' ');
@@ -24,7 +25,7 @@ function validate(report){
  if(report.apps){const a=report.apps,str=x=>typeof x==='string';
   const comp=c=>c&&str(c.name)&&num(c.bytes)&&Array.isArray(c.paths)&&c.paths.every(str)&&str(c.safety)&&str(c.what)&&str(c.why)&&str(c.ifRemoved);
   if(!Array.isArray(a.apps)||a.apps.length>500||!a.apps.every(x=>x&&str(x.id)&&str(x.name)&&str(x.tone)&&num(x.bytes)&&Array.isArray(x.components)&&x.components.length<=2000&&x.components.every(comp))||!Array.isArray(a.unrecognized)||a.unrecognized.length>1000||!a.unrecognized.every(x=>x&&str(x.path)&&num(x.bytes)&&num(x.ownBytes)))throw Error('Uygulama bilgileri geçersiz.');}
- if(report.ui){if(typeof report.ui.homePath!=='string'||!Array.isArray(report.ui.findings)||report.ui.findings.length>1000||!report.ui.findings.every(x=>item(x)&&['cache','review'].includes(x.group)&&typeof x.note==='string'))throw Error('Arayüz inceleme verileri geçersiz.');}
+ if(report.ui){if(typeof report.ui.homePath!=='string'||!Array.isArray(report.ui.findings)||report.ui.findings.length>1000||!report.ui.findings.every(x=>item(x)&&['cache','review'].includes(x.group)&&typeof x.note==='string'&&(x.safety===undefined||['güvenli','incele'].includes(x.safety))))throw Error('Arayüz inceleme verileri geçersiz.');}
  return report;
 }
 function buildIndex(root){index=new Map();ancestors=new Map();function visit(node,chain){if(node.aggregate)return;index.set(node.path,node);ancestors.set(node.path,chain);(node.children||[]).forEach(child=>visit(child,[...chain,node]));}visit(root,[]);}
@@ -36,7 +37,7 @@ function getFindings(report){
 }
 function load(report){
  validate(report);data=report;buildIndex(report.tree);home=index.get(report.ui?.homePath)||[...index.values()].filter(x=>/^\/Users\/[^/]+$/.test(x.path)&&x.path!=='/Users/Shared').sort((a,b)=>b.bytes-a.bytes)[0]||report.tree;
- current=home;mode='folders';selected=new Set();findings=getFindings(report).sort((a,b)=>b.bytes-a.bytes);
+ current=home;mode='folders';selected=new Set();buildCleanable(report);currentScanId=pendingScanId;pendingScanId=null;staleScan=false;findings=getFindings(report).sort((a,b)=>b.bytes-a.bytes);
  $('findingsSearch').value='';$('fileSearch').value='';$('welcome').classList.add('hidden');$('scanning').classList.add('hidden');$('dashboard').classList.remove('hidden');$('message').classList.add('hidden');
  $('scanDate').textContent=new Date(report.created).toLocaleString('tr-TR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'});
  $('scanMeta').textContent=(report.demo?'ÖRNEK VERİ · ':'')+(report.stats.entries>=1e6?new Intl.NumberFormat('tr-TR',{maximumFractionDigits:2}).format(report.stats.entries/1e6)+' milyon':report.stats.entries.toLocaleString('tr-TR'))+' kayıt · yerel ölçüm';
@@ -48,7 +49,7 @@ function load(report){
  if(report.demo||report.incomplete||report.fullDiskAccess==='denied'){$('message').textContent=[report.demo?'Örnek veriler Mac’ine ait değildir.':'',report.incomplete?'Kısmi tarama: süre veya kayıt sınırı aşıldı ya da tarama iptal edildi.':'',report.fullDiskAccess==='denied'?'Tam Disk Erişimi olmadan yapıldı; korumalı klasörler ölçülmedi.':''].filter(Boolean).join(' ');$('message').classList.remove('hidden');}
  showAppsTabs(!!report.apps);expandedApps=new Set();$('appsSearch').value='';$('unrecognizedSearch').value='';renderFindings();renderFiles();renderHealth();showView('explorer');
 }
-function showView(view){if(!['explorer','files','health','history','apps','unrecognized'].includes(view))return;if(!data){showToast('Önce bir disk raporu aç.');return;}if((view==='apps'||view==='unrecognized')&&!data.apps){showToast('Bu rapor uygulama bilgisi içermiyor.');return;}activeView=view;document.querySelectorAll('.view').forEach(node=>node.classList.toggle('hidden',node.id!=='view-'+view));document.querySelectorAll('.nav-btn').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});if(view==='explorer')requestAnimationFrame(renderMap);if(view==='history')renderHistory();if(view==='apps')renderApps();if(view==='unrecognized')renderUnrecognized();}
+function showView(view){if(!['explorer','files','health','history','apps','unrecognized'].includes(view))return;if(!data){showToast('Önce bir disk raporu aç.');return;}if((view==='apps'||view==='unrecognized')&&!data.apps){showToast('Bu rapor uygulama bilgisi içermiyor.');return;}activeView=view;document.querySelectorAll('.view').forEach(node=>node.classList.toggle('hidden',node.id!=='view-'+view));document.querySelectorAll('.nav-btn').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});if(view==='explorer'){renderFindings();requestAnimationFrame(renderMap);}if(view==='history')renderHistory();if(view==='apps')renderApps();if(view==='unrecognized')renderUnrecognized();}
 // Squarified treemap: build rows with nearly square rectangles rather than long strips.
 function squarify(items,x,y,width,height){
  const input=items.filter(item=>item.bytes>0).slice().sort((a,b)=>b.bytes-a.bytes);if(!input.length||width<=0||height<=0)return [];
@@ -82,8 +83,10 @@ function drawTile(container,rect,depth,categoryMode){
  if(w>34&&h>25)button.append(element('span','name',item.name));if(w>58&&h>57)button.append(element('span','size',format(item.bytes)));
  button.onclick=()=>{if(!categoryMode&&!item.aggregate&&item.children?.length)goTo(item);else showDetails(item);};container.append(button);
 }
-function uniqueSelection(items=findings.filter(item=>selected.has(item.path))){return items.filter(item=>!items.some(other=>other.path!==item.path&&isWithin(item.path,other.path)));}
-function renderSelection(){const raw=findings.filter(item=>selected.has(item.path)),items=uniqueSelection(raw);$('selectionSize').textContent=format(total(items));$('selectionCount').textContent=raw.length+' öğe seçildi'+(raw.length>items.length?' · alt klasörler bir kez sayıldı':'');$('copySelection').disabled=!items.length;$('clearSelection').disabled=!raw.length;}
+function selectionItems(){const items=findings.filter(item=>selected.has(item.path));const seen=new Set(items.map(item=>item.path));for(const path of selected)if(!seen.has(path)&&cleanable.has(path))items.push({path,...cleanable.get(path)});return items;}
+function buildCleanable(report){cleanable=new Map();for(const f of report.ui?.findings||[])if(f.safety==='güvenli'||f.safety==='incele')cleanable.set(f.path,{name:f.name,bytes:f.bytes,safety:f.safety});for(const app of report.apps?.apps||[])for(const c of app.components){if(c.safety==='asla')continue;c.paths.forEach((p,i)=>{if(!cleanable.has(p))cleanable.set(p,{name:c.paths.length>1?c.name+' · '+p.split('/').slice(-2).join('/'):c.name,bytes:(c.pathBytes||[])[i]??c.bytes,safety:c.safety});});}}
+function uniqueSelection(items=selectionItems()){return items.filter(item=>!items.some(other=>other.path!==item.path&&isWithin(item.path,other.path)));}
+function renderSelection(){const raw=selectionItems(),items=uniqueSelection(raw);$('selectionSize').textContent=format(total(items));$('selectionCount').textContent=raw.length+' öğe seçildi'+(raw.length>items.length?' · alt klasörler bir kez sayıldı':'');$('copySelection').disabled=!items.length;$('clearSelection').disabled=!raw.length;renderCleanup();}
 function renderFindings(){
  const query=$('findingsSearch').value.trim().toLocaleLowerCase('tr-TR');const matches=findings.filter(item=>(item.name+' '+shortPath(item.path)).toLocaleLowerCase('tr-TR').includes(query));$('findingsCount').textContent=matches.length+' öğe';const list=$('findingsList');list.replaceChildren();
  for(const group of ['cache','review']){const items=matches.filter(item=>item.group===group);if(!items.length)continue;const heading=element('div','group-heading'+(group==='review'?' review':''));heading.append(element('span','',group==='cache'?'Önbellek & derleme':'Uygulama & ortam verileri'),element('span','group-size',format(total(uniqueSelection(items)))));list.append(heading);
@@ -109,7 +112,7 @@ function showDetails(item){
  const node=index.get(item.path),actions=element('div','detail-actions');if(!item.aggregate&&!item.categoryView){if(node?.children?.length){const explore=element('button','button dark','Haritada keşfet');explore.onclick=()=>{closeDialog();goTo(node);};actions.append(explore);}const copy=element('button','button','Yolu kopyala');copy.onclick=()=>copyText(item.path);actions.append(copy);if(reference){const select=element('button','button',selected.has(item.path)?'Listeden çıkar':'İnceleme listeme ekle');select.onclick=()=>{if(selected.has(item.path))selected.delete(item.path);else selected.add(item.path);select.textContent=selected.has(item.path)?'Listeden çıkar':'İnceleme listeme ekle';renderFindings();renderMap();};actions.append(select);}}body.append(actions);
  if(!item.aggregate&&!item.categoryView&&node?.children?.length){const children=element('div','detail-children');children.append(element('p','panel-subtitle','Bu konumdaki en büyük alt öğeler'));for(const child of node.children.slice(0,6)){const button=element('button','detail-child');button.append(element('span','',child.name),element('strong','',format(child.bytes)),icon('right'));button.onclick=()=>showDetails(child);children.append(button);}body.append(children);}
 }
-function showHelp(){const body=openDialog('Yerel bir harita. Net bir bakış.','NASIL ÇALIŞIR?');const help=element('div','help-content');const sections=[['Gerçek ölçüm, yerel görünüm','Bu arayüz mevcut Disk Atlas JSON taramasını gösterir. HTML sayfası diske kendiliğinden erişmez. Üstteki tarih, verilerin ölçüldüğü zamanı belirtir.'],['Haritayı keşfet','Klasörler alanlarıyla orantılı çizilir; alt klasörler aynı blok içinde görünür. Bir bloğa tıkla, klasör yoluyla geri dön veya Türler görünümünü aç. Haritadaki küçük öğeler birleştirilir; ölçülen toplamları korunur.'],['Kendi inceleme listen','Sağdaki kutuları işaretleyerek yalnızca bir liste oluşturursun. Listeyi kopyalamak dosyalarda işlem yapmaz. Bir üst klasör ve onun alt klasörü birlikte seçilirse alan bir kez sayılır.'],['Boyutları doğru yorumla','Ayrılan alan, dosyanın diskte kapladığı blokların toplamıdır. Mantıksal boyut farklı olabilir. APFS klonları, korumalı alanlar ve anlık görüntüler nedeniyle bu rapor tam disk toplamıyla eşit olmak zorunda değildir.'],['Yeni veriyle güncelle','Yeni bir Disk Atlas JSON raporu oluştuğunda Rapor aç düğmesiyle seçebilirsin. Rapor tarayıcı belleğinde işlenir; sunucuya gönderilmez. Mevcut taramadan arayüzü yeniden oluşturmak için proje klasöründe python3 -B build_ui.py çalıştırılabilir.']];if(bridge){sections[0]=['Gerçek ölçüm, yerel görünüm','Disk Atlas, Tara dediğinde Mac’indeki dosyaların yalnızca adını, yolunu ve boyutunu okur; dosyaların içine bakmaz. Sonuçlar bu Mac’te kalır, ağa hiçbir şey gönderilmez. Üstteki tarih, verilerin ölçüldüğü zamanı belirtir.'];sections[4]=['Taramalar ve izin','Her tarama bu Mac’e kaydedilir ve uygulama açıldığında en sonuncusu gösterilir. Tam Disk Erişimi olmadan korumalı klasörler okunamaz ve sonuç kısmi olur. Eski Python raporlarını Rapor aç düğmesiyle de görüntüleyebilirsin.'];}
+function showHelp(){const body=openDialog('Yerel bir harita. Net bir bakış.','NASIL ÇALIŞIR?');const help=element('div','help-content');const sections=[['Gerçek ölçüm, yerel görünüm','Bu arayüz mevcut Disk Atlas JSON taramasını gösterir. HTML sayfası diske kendiliğinden erişmez. Üstteki tarih, verilerin ölçüldüğü zamanı belirtir.'],['Haritayı keşfet','Klasörler alanlarıyla orantılı çizilir; alt klasörler aynı blok içinde görünür. Bir bloğa tıkla, klasör yoluyla geri dön veya Türler görünümünü aç. Haritadaki küçük öğeler birleştirilir; ölçülen toplamları korunur.'],['Kendi inceleme listen','Sağdaki kutuları işaretleyerek yalnızca bir liste oluşturursun. Listeyi kopyalamak dosyalarda işlem yapmaz. Bir üst klasör ve onun alt klasörü birlikte seçilirse alan bir kez sayılır.'],['Boyutları doğru yorumla','Ayrılan alan, dosyanın diskte kapladığı blokların toplamıdır. Mantıksal boyut farklı olabilir. APFS klonları, korumalı alanlar ve anlık görüntüler nedeniyle bu rapor tam disk toplamıyla eşit olmak zorunda değildir.'],['Yeni veriyle güncelle','Yeni bir Disk Atlas JSON raporu oluştuğunda Rapor aç düğmesiyle seçebilirsin. Rapor tarayıcı belleğinde işlenir; sunucuya gönderilmez. Mevcut taramadan arayüzü yeniden oluşturmak için proje klasöründe python3 -B build_ui.py çalıştırılabilir.']];if(bridge){sections[0]=['Gerçek ölçüm, yerel görünüm','Disk Atlas, Tara dediğinde Mac’indeki dosyaların yalnızca adını, yolunu ve boyutunu okur; dosyaların içine bakmaz. Sonuçlar bu Mac’te kalır, ağa hiçbir şey gönderilmez. Üstteki tarih, verilerin ölçüldüğü zamanı belirtir.'];sections[4]=['Taramalar ve izin','Her tarama bu Mac’e kaydedilir ve uygulama açıldığında en sonuncusu gösterilir. Tam Disk Erişimi olmadan korumalı klasörler okunamaz ve sonuç kısmi olur. Eski Python raporlarını Rapor aç düğmesiyle de görüntüleyebilirsin.'];if(cleanupEnabled)sections.push(['Çöp Sepeti’ne taşıma','Seçtiğin öğeleri onayınla Çöp Sepeti’ne taşıyabilirsin. Kalıcı silme yoktur ve Çöp Sepeti boşaltılmaz; alan, Çöp Sepeti’ni boşalttığında açılır. Önce nelerin taşınacağı listelenir, “İncele” düzeyindeki öğeler için ek onay gerekir. Taşımadan sonra tarama güncel olmaz; yeniden tara. Yapılanların kaydı Application Support/DiskAtlas/actions.log dosyasındadır.']);}
  for(const [title,text] of sections)help.append(element('h3','',title),element('p','',text));body.append(help);}
 function showToast(text){clearTimeout(toastTimer);$('toast').textContent=text;$('toast').classList.remove('hidden');toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),3500);}
 async function copyText(text){try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);else{const area=element('textarea');area.value=text;area.style.position='fixed';area.style.left='-9999px';document.body.append(area);area.select();const copied=document.execCommand('copy');area.remove();if(!copied)throw Error('clipboard');}showToast('Kopyalandı. Dosyalarda işlem yapılmadı.');}catch{showToast('Tarayıcı kopyalamayı engelledi. Kopyalamak için metni seçebilirsin.');}}
@@ -117,7 +120,7 @@ function selectionText(){return 'Disk Atlas — yalnızca inceleme listesi\nÖl�
 document.querySelectorAll('.nav-btn').forEach(button=>button.onclick=()=>showView(button.dataset.view));
 $('foldersBtn').onclick=()=>{mode='folders';renderMap();};$('categoriesBtn').onclick=()=>{mode='categories';renderMap();};$('upBtn').onclick=()=>{const chain=ancestors.get(current.path)||[];if(chain.length)goTo(chain.at(-1));};$('homeBtn').onclick=()=>goTo(home);
 $('findingsSearch').oninput=renderFindings;$('fileSearch').oninput=renderFiles;
-$('clearSelection').onclick=()=>{selected.clear();renderFindings();renderMap();};$('copySelection').onclick=()=>copyText(selectionText());
+$('clearSelection').onclick=$('cleanupClear').onclick=()=>{selected.clear();renderFindings();if(activeView==='apps')renderApps();if(activeView==='explorer')renderMap();};$('copySelection').onclick=()=>copyText(selectionText());
 $('coverageBtn').onclick=()=>showView('health');$('helpBtn').onclick=showHelp;
 $('importBtn').onclick=$('welcomeImport').onclick=()=>$('fileInput').click();
 $('fileInput').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>40*1000**2)throw Error('JSON raporu en fazla 40 MB olabilir.');load(JSON.parse(await file.text()));}catch(error){$('message').textContent='Rapor açılamadı: '+error.message;$('message').classList.remove('hidden');}finally{event.target.value='';}};
@@ -149,7 +152,7 @@ function showIdleScreen() { if (data) $('dashboard').classList.remove('hidden');
 function setScanning(on) {
   scanning = on; $('scanning').classList.toggle('hidden', !on); $('scanBtn').disabled = on;
   if (on) { $('welcome').classList.add('hidden'); $('dashboard').classList.add('hidden'); $('message').classList.add('hidden'); }
-  updatePermissionBanner();
+  updatePermissionBanner(); renderCleanup(true);
 }
 async function startScan() {
   if (!bridge || scanning) return;
@@ -161,7 +164,12 @@ async function cancelScan() {
   try { await bridge.request('cancelScan'); $('scanProgressText').textContent = 'Tarama durduruluyor…'; }
   catch (error) { showMessage('Tarama durdurulamadı: ' + error.message); }
 }
-async function openSavedScan(id) { load(await bridge.request('loadScan', { id })); updatePermissionBanner(); }
+async function openSavedScan(id) {
+  const report = await bridge.request('loadScan', { id });
+  pendingScanId = id;
+  try { load(report); } finally { pendingScanId = null; }
+  renderCleanup(true); updatePermissionBanner();
+}
 window.diskAtlasEvent = async event => {
   if (event.event === 'scanProgress') {
     $('scanProgressText').textContent = clock(event.elapsed) + ' · ' + event.records.toLocaleString('tr-TR') + ' kayıt · ' + event.errors.toLocaleString('tr-TR') + ' erişilemeyen · ' + event.folder;
@@ -190,6 +198,8 @@ async function bootNative() {
   $('scanBtn').classList.remove('hidden'); $('historyNav').classList.remove('hidden'); $('welcomeFile').classList.add('hidden'); $('welcomeNative').classList.remove('hidden');
   try { const info = await bridge.request('appInfo'); $('appInfoText').textContent = 'Disk Atlas ' + info.version + ' · macOS ' + info.macOS; } catch {}
   try { renderPermission((await bridge.request('permissionStatus')).status); } catch { renderPermission('unknown'); }
+  try { cleanupEnabled = Boolean((await bridge.request('capabilities')).cleanup); } catch { cleanupEnabled = false; }
+  applyCleanupTexts();
   let scans = [];
   try { scans = await bridge.request('listScans'); } catch (error) { showMessage('Tarama listesi okunamadı: ' + error.message); }
   if (scans.length) {
@@ -324,7 +334,14 @@ function componentBlock(component) {
   top.append(element('span', 'component-name', component.name), element('span', 'component-size', format(component.bytes)), badge);
   block.append(top);
   for (const path of component.paths) {
-    const line = element('div', 'component-path', shortPath(path)); line.setAttribute('title', path);
+    const line = element('div', 'component-path'); line.setAttribute('title', path);
+    if (cleanupAvailable() && component.safety !== 'asla' && cleanable.has(path)) {
+      const box = element('input', 'finding-check'); box.type = 'checkbox'; box.checked = selected.has(path);
+      box.setAttribute('aria-label', component.name + ' · ' + shortPath(path) + ' öğesini Çöp Sepeti’ne taşımak için seç');
+      box.onchange = () => { if (box.checked) selected.add(path); else selected.delete(path); renderSelection(); if (activeView === 'explorer') renderMap(); };
+      line.append(box);
+    }
+    line.append(document.createTextNode(shortPath(path)));
     const show = mapButton(path); if (show) line.append(show);
     block.append(line);
   }
@@ -380,6 +397,89 @@ function renderUnrecognized() {
     body.append(row);
   }
 }
+// ---- Çöp Sepeti'ne taşıma (yalnızca yerel kip; kararı Swift verir, burada yalnızca yol ve onay gönderilir) ----
+function cleanupAvailable() { return Boolean(bridge && cleanupEnabled && currentScanId && data && !staleScan && !scanning && !cleaning); }
+function applyCleanupTexts() {
+  $('modeBadgeText').textContent = cleanupEnabled ? 'Silme: yalnızca Çöp Sepeti' : 'Salt okunur';
+  $('footerStatusText').textContent = cleanupEnabled
+    ? 'Disk Atlas yalnızca senin seçip onayladığın öğeleri Çöp Sepeti’ne taşır. Kalıcı silmez, Çöp Sepeti’ni boşaltmaz.'
+    : 'Yalnızca gözlem. Silme, taşıma veya temizlik işlemi yok.';
+}
+function renderCleanup(rerenderApps = false) {
+  const items = uniqueSelection().filter(item => cleanable.has(item.path));
+  const show = cleanupAvailable() && items.length > 0;
+  $('cleanupBar').classList.toggle('hidden', !show);
+  $('cleanupSize').textContent = format(total(items));
+  $('cleanupCount').textContent = items.length + ' öğe seçildi';
+  $('cleanupBtn').disabled = !show;
+  $('staleBar').classList.toggle('hidden', !(bridge && cleanupEnabled && staleScan && data && !scanning));
+  if (rerenderApps && activeView === 'apps') renderApps();
+}
+async function openTrashPlan() {
+  if (!cleanupAvailable()) return;
+  const paths = uniqueSelection().filter(item => cleanable.has(item.path)).map(item => item.path);
+  if (!paths.length) return;
+  let result;
+  try { result = await bridge.request('planTrash', { scanId: currentScanId, paths }); }
+  catch (error) { showMessage('Taşıma planı hazırlanamadı: ' + error.message); return; }
+  showTrashPlan(result);
+}
+function showTrashPlan(result) {
+  const body = openDialog('Çöp Sepeti’ne taşı', 'İŞLEM ONAYI');
+  body.append(element('p', '', 'Seçtiğin öğeler silinmez; Çöp Sepeti’ne taşınır ve oradan Geri Koy ile geri alınabilir. Çöp Sepeti’ni boşaltana kadar disk üzerinde yer açılmaz.'));
+  const list = element('div', 'trash-list');
+  for (const item of result.items.filter(entry => entry.status !== 'covered')) {
+    const accepted = item.status === 'accepted';
+    const row = element('div', 'trash-row' + (accepted ? '' : ' rejected')); row.setAttribute('title', item.path);
+    row.append(element('span', 'trash-name', item.name));
+    if (accepted) row.append(element('span', 'trash-size', format(item.bytes)), element('span', 'badge safety-' + item.safety, safetyLabels[item.safety] || item.safety));
+    else row.append(element('span', 'trash-reason', item.reason || 'Taşınamaz.'));
+    list.append(row);
+  }
+  body.append(list);
+  const covered = result.items.filter(entry => entry.status === 'covered').length;
+  if (covered) body.append(element('p', 'footnote', covered + ' öğe, seçilen üst klasörün içinde olduğu için ayrıca taşınmaz.'));
+  body.append(element('p', 'trash-total', 'Toplam: ' + format(result.totalBytes) + ' · ' + result.acceptedCount + ' öğe'));
+  let acknowledge = null;
+  if (result.needsAcknowledge) {
+    const label = element('label', 'trash-ack'); acknowledge = element('input'); acknowledge.type = 'checkbox';
+    label.append(acknowledge, document.createTextNode(' “İncele” düzeyindeki öğelerin ne olduğunu okudum; Çöp Sepeti’ne taşınmasını istiyorum.'));
+    body.append(label);
+  }
+  const actions = element('div', 'dialog-actions'), cancel = element('button', 'button', 'Vazgeç'), confirm = element('button', 'button dark', 'Çöp Sepeti’ne taşı');
+  confirm.disabled = result.acceptedCount === 0 || Boolean(acknowledge);
+  if (acknowledge) acknowledge.onchange = () => { confirm.disabled = !acknowledge.checked; };
+  cancel.onclick = closeDialog;
+  confirm.onclick = async () => { closeDialog(); await runTrash(result.planId, Boolean(acknowledge && acknowledge.checked)); };
+  actions.append(cancel, confirm); body.append(actions);
+}
+async function runTrash(planId, acknowledgeReview) {
+  cleaning = true; renderCleanup(true);
+  let outcome;
+  try { outcome = await bridge.request('confirmTrash', { planId, acknowledgeReview }); }
+  catch (error) { cleaning = false; renderCleanup(true); showMessage('Taşıma yapılamadı: ' + error.message); return; }
+  cleaning = false;
+  if (outcome.results.some(entry => entry.ok)) { staleScan = true; selected = new Set(); renderFindings(); }
+  renderCleanup(true);
+  showTrashResult(outcome);
+}
+function showTrashResult(outcome) {
+  const body = openDialog('Taşıma sonucu', 'İŞLEM SONUCU');
+  const moved = outcome.results.filter(entry => entry.ok).length;
+  body.append(element('p', '', moved + ' öğe Çöp Sepeti’ne taşındı (' + format(outcome.movedBytes) + ').' + (outcome.failedCount ? ' ' + outcome.failedCount + ' öğe taşınamadı.' : '')));
+  const list = element('div', 'trash-list');
+  for (const entry of outcome.results) {
+    const row = element('div', 'trash-row' + (entry.ok ? '' : ' rejected')); row.setAttribute('title', entry.path);
+    row.append(element('span', 'trash-name', shortPath(entry.path)), element('span', entry.ok ? 'trash-size' : 'trash-reason', entry.ok ? 'Taşındı' : (entry.reason || 'Taşınamadı')));
+    list.append(row);
+  }
+  body.append(list);
+  body.append(element('p', 'footnote', 'Geri almak için Çöp Sepeti’ni aç, öğeye sağ tıklayıp Geri Koy’u seç. Disk alanı, Çöp Sepeti’ni boşalttığında açılır.' + (moved ? ' Bu tarama artık güncel değil; sayıları yenilemek için yeniden tara.' : '')));
+  const actions = element('div', 'dialog-actions'), close = element('button', 'button dark', 'Kapat');
+  close.onclick = closeDialog; actions.append(close); body.append(actions);
+}
+$('cleanupBtn').onclick = openTrashPlan;
+$('staleRescan').onclick = startScan;
 $('appsSearch').oninput = renderApps;
 $('unrecognizedSearch').oninput = renderUnrecognized;
 
