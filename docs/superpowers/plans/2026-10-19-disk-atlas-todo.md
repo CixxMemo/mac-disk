@@ -15,11 +15,11 @@ Durum: `[ ]` yapılmadı · `[~]` sürüyor · `[x]` bitti
 
 ## Aşama 1 — Çekirdek (Swift kütüphanesi)
 Ayrıntılı plan: `docs/superpowers/plans/2026-10-19-stage1-core.md`
-- [ ] G1: Paket iskeleti, rapor modeli, eski rapor içe aktarma
-- [ ] G2: Kural dosyasıyla sınıflandırıcı (`rules.json`)
-- [ ] G3: Dosya sistemi soyutlaması ve tarayıcı çekirdeği
-- [ ] G4: Kırpma, adaylar, en büyük dosyalar, iptal, şema 2 alanları
-- [ ] G5: Python eşdeğerlik testi ve `disk-atlas-scan` aracı
+- [x] G1: Paket iskeleti, rapor modeli, eski rapor içe aktarma
+- [x] G2: Kural dosyasıyla sınıflandırıcı (`rules.json`)
+- [x] G3: Dosya sistemi soyutlaması ve tarayıcı çekirdeği
+- [x] G4: Kırpma, adaylar, en büyük dosyalar, iptal, şema 2 alanları
+- [x] G5: Python eşdeğerlik testi ve `disk-atlas-scan` aracı
 - **Bitti sayılır:** `swift test` yeşil; `/Applications` üzerinde Swift ve Python toplamı %0,1 içinde; gerçek Python raporu içe aktarılıyor.
 
 ## Aşama 2 — Uygulama kabuğu
