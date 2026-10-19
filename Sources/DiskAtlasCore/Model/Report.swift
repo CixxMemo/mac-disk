@@ -78,6 +78,8 @@ public struct Report: Codable, Equatable, Sendable {
     public var legacy: Bool?
     /// Taramanın başında Tam Disk Erişimi durumu (`granted`/`denied`/`unknown`); `denied` ise sonuç kısmidir.
     public var fullDiskAccess: String?
+    /// Taramayı yapan kullanıcının ana klasörü (görünen yol); Uygulamalar görünümünde `~` bununla çözülür.
+    public var homePath: String?
 }
 
 extension Report {

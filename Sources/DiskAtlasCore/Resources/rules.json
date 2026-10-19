@@ -318,6 +318,18 @@
           "what": "Maven’ın indirdiği Java kütüphanelerinin yerel deposu.",
           "why": "Yeniden indirilebilen bir önbellektir.",
           "ifRemoved": "Sonraki derleme kütüphaneleri yeniden indirir."
+        },
+        {
+          "id": "gradle-other",
+          "name": "Gradle diğer (wrapper, ayarlar)",
+          "paths": [
+            "~/.gradle"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Gradle’ın indirdiği dağıtımlar (wrapper), ayarları ve diğer yerel verileri.",
+          "why": "Gradle araç zincirine ait yerel veridir.",
+          "ifRemoved": "Gradle dağıtımları gerektiğinde yeniden indirilir; ayarlar sıfırlanabilir."
         }
       ]
     },
@@ -617,6 +629,18 @@
           "what": "Chrome’un profilleri: yer imleri, geçmiş, oturumlar, kayıtlı parolalar ve eklentiler.",
           "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
           "ifRemoved": "Yer imleri, oturumlar ve kayıtlı veriler kaybolabilir."
+        },
+        {
+          "id": "google-updater",
+          "name": "Google güncelleyici önbelleği",
+          "paths": [
+            "~/Library/Application Support/Google/GoogleUpdater"
+          ],
+          "safety": "incele",
+          "category": "cache",
+          "what": "Google yazılım güncelleyicisinin indirdiği güncelleme paketleri.",
+          "why": "Güncelleme dosyalarının önbelleğidir.",
+          "ifRemoved": "Güncellemeler gerektiğinde yeniden indirilir."
         }
       ]
     },
@@ -667,6 +691,18 @@
           "what": "Spotify’ın hızlı açılış ve çevrimdışı dinleme için sakladığı müzik önbelleği.",
           "why": "Yeniden indirilebilen bir önbellektir.",
           "ifRemoved": "Şarkılar yeniden indirilir; çevrimdışı indirmeleriniz silinebilir."
+        },
+        {
+          "id": "spotify-data",
+          "name": "Spotify uygulama verisi",
+          "paths": [
+            "~/Library/Application Support/Spotify"
+          ],
+          "safety": "incele",
+          "category": "cache",
+          "what": "Spotify’ın güncelleme paketleri ve kalıcı önbellek verileri.",
+          "why": "Uygulamanın yerel çalışma verisidir.",
+          "ifRemoved": "Spotify verileri yeniden indirir; çevrimdışı indirmeleriniz etkilenebilir."
         }
       ]
     },
@@ -899,6 +935,25 @@
           "ifRemoved": "Notion verileri yeniden eşitler; kaydedilmemiş yerel değişiklikler kaybolabilir."
         },
         {
+          "id": "canva",
+          "name": "Canva",
+          "paths": [
+            "~/Library/Containers/com.canva.canvaeditor"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Canva masaüstü uygulamasının önbelleği ve yerel verileri.",
+          "why": "Uygulamanın yerel çalışma verisidir.",
+          "ifRemoved": "Canva ilk açılışta verileri yeniden indirir; kaydedilmemiş yerel çalışma kaybolabilir."
+        }
+      ]
+    },
+    {
+      "id": "games",
+      "name": "Oyunlar",
+      "tone": "system",
+      "components": [
+        {
           "id": "steam",
           "name": "Steam",
           "paths": [
@@ -909,6 +964,84 @@
           "what": "Steam’in yüklü oyunları ve yerel verileri.",
           "why": "Oyunlarınızı ve kayıtlarını içerebilir.",
           "ifRemoved": "Oyunlar silinir; yeniden indirilebilir ama bazı yerel kayıtlar kaybolabilir."
+        },
+        {
+          "id": "minecraft",
+          "name": "Minecraft",
+          "paths": [
+            "~/Library/Application Support/minecraft"
+          ],
+          "safety": "incele",
+          "category": "personal",
+          "what": "Minecraft’ın oyun dosyaları, dünyaları (kayıtlar) ve başlatıcı verileri.",
+          "why": "Oyun ilerlemenizi içerebilir.",
+          "ifRemoved": "Dünyalarınız ve kayıtlarınız kaybolabilir; oyun dosyaları yeniden indirilebilir."
+        }
+      ]
+    },
+    {
+      "id": "dotnet",
+      "name": ".NET ve NuGet",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "nuget",
+          "name": "NuGet önbelleği",
+          "paths": [
+            "~/.nuget",
+            "~/.local/share/NuGet"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "NuGet’in indirdiği .NET paketlerinin önbelleği.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Sonraki derleme paketleri yeniden indirir."
+        }
+      ]
+    },
+    {
+      "id": "ai-editors",
+      "name": "Yapay zekâ kod araçları",
+      "tone": "ai",
+      "components": [
+        {
+          "id": "cursor",
+          "name": "Cursor",
+          "paths": [
+            "~/Library/Application Support/Cursor",
+            "~/.cursor"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Cursor kod düzenleyicisinin ayarları, eklentileri ve çalışma verileri.",
+          "why": "Kişiselleştirmelerinizi ve yerel çalışma verisini içerir.",
+          "ifRemoved": "Ayarlar ve eklentiler sıfırlanabilir."
+        },
+        {
+          "id": "codex",
+          "name": "Codex",
+          "paths": [
+            "~/.codex",
+            "~/.cache/codex-runtimes"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Codex aracının ayarları, oturumları ve indirdiği çalışma zamanı bağımlılıkları.",
+          "why": "Aracın yerel çalışma verisidir.",
+          "ifRemoved": "Oturum geçmişi ve ayarlar sıfırlanır; bağımlılıklar gerektiğinde yeniden indirilir."
+        },
+        {
+          "id": "qoder",
+          "name": "Qoder",
+          "paths": [
+            "~/.qoder",
+            "~/Library/Application Support/Qoder"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Qoder kod düzenleyicisinin eklentileri, önbelleği ve ayarları.",
+          "why": "Aracın yerel çalışma verisidir.",
+          "ifRemoved": "Eklentiler ve ayarlar sıfırlanabilir."
         }
       ]
     }
