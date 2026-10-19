@@ -20,6 +20,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             var dataRoot = FileManager.default.fileExists(atPath: "/System/Volumes/Data") ? "/System/Volumes/Data" : home
             var homeRoot = home
             var storeDirectory = ReportStore.defaultDirectory()
+            var scanRoots = ScanRoots(data: dataRoot, home: homeRoot)
+            var trasher: Trasher = FileManagerTrasher()
+            var actionLogURL = storeDirectory.deletingLastPathComponent().appendingPathComponent("actions.log")
             if config.selfTest {
                 // Sınama gerçek taramaları kirletmez: kök ve kayıt klasörü bayraklarla gelir.
                 guard let root = config.scanRoot, let store = config.storeDirectory else {
@@ -34,9 +37,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 dataRoot = root
                 homeRoot = root
                 storeDirectory = URL(fileURLWithPath: store)
+                // Sınama gerçek Çöp Sepeti'ne dokunmaz: taşınanlar kayıt klasöründeki `trash-sim` altına gider.
+                trasher = DirectoryTrasher(directory: storeDirectory.appendingPathComponent("trash-sim").path)
+                actionLogURL = storeDirectory.appendingPathComponent("actions.log")
             }
+            scanRoots = ScanRoots(data: dataRoot, home: homeRoot,
+                                  applications: config.selfTest ? homeRoot + "/Applications" : "/Applications")
             let host = try WebHost(webRoot: webRoot, rulesURL: rulesURL, store: ReportStore(directory: storeDirectory),
-                                   roots: ScanRoots(data: dataRoot, home: homeRoot))
+                                   roots: scanRoots, trasher: trasher, actionLogURL: actionLogURL)
             self.host = host
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1280, height: 820),
                                   styleMask: [.titled, .closable, .miniaturizable, .resizable],
