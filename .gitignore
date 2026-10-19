@@ -5,3 +5,4 @@ Disk-Atlas.onceki.html
 .build/
 .DS_Store
 *.zip
+.superpowers/
