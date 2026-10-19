@@ -6,8 +6,10 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "DiskAtlasCore", targets: ["DiskAtlasCore"]),
+        .executable(name: "disk-atlas-scan", targets: ["disk-atlas-scan"]),
     ],
     targets: [
+        .executableTarget(name: "disk-atlas-scan", dependencies: ["DiskAtlasCore"]),
         .target(name: "DiskAtlasCore", resources: [.process("Resources")]),
         .testTarget(
             name: "DiskAtlasCoreTests",

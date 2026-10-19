@@ -6,3 +6,4 @@ Disk-Atlas.onceki.html
 .DS_Store
 *.zip
 .superpowers/
+__pycache__/
