@@ -14,7 +14,7 @@ final class WebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKURLSchemeHa
     private(set) var consoleErrors: [String] = []
     var onLoadFinished: (() -> Void)?
 
-    init(webRoot: URL, rulesURL: URL, store: ReportStore, roots: ScanRoots) throws {
+    init(webRoot: URL, rulesURL: URL, store: ReportStore, roots: ScanRoots, trasher: Trasher, actionLogURL: URL) throws {
         resolver = AssetResolver(root: webRoot)
         super.init()
         // Yapılandırma, WKWebView oluşturulmadan önce tamamlanmalıdır; sonradan yapılan değişiklikler yok sayılır.
@@ -41,7 +41,8 @@ final class WebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKURLSchemeHa
             },
             emit: { [weak self] event in
                 DispatchQueue.main.async { self?.deliver(event) }
-            })
+            },
+            trasher: trasher, actionLogURL: actionLogURL)
     }
 
     func load() {

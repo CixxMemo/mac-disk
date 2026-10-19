@@ -60,6 +60,18 @@ final class DisplayEnvelopeTests: XCTestCase {
         XCTAssertEqual((findings[0]["bytes"] as? NSNumber)?.int64Value, 3 * gb)
     }
 
+    func testFindingsCarrySafetyAndScannerCandidatesAreReview() throws {
+        var base = try report(["/Users/me/a": 3 * gb, "/Users/me/b": 2 * gb])
+        base.candidates = [Candidate(name: ".next", path: "/Users/me/web/.next", bytes: 300 * mb, logical: 300 * mb,
+                                     category: .build, label: "Derleme", note: "aday notu")]
+        let object = try json(DisplayEnvelope(report: base, rules: try rules()))
+        let findings = try XCTUnwrap((object["ui"] as? [String: Any])?["findings"] as? [[String: Any]])
+        let safety = Dictionary(uniqueKeysWithValues: findings.map { ($0["path"] as! String, $0["safety"] as? String) })
+        XCTAssertEqual(safety["/Users/me/a"], "incele")
+        XCTAssertEqual(safety["/Users/me/b"], "güvenli")
+        XCTAssertEqual(safety["/Users/me/web/.next"], "incele", "tarayıcı adayı hiçbir zaman 'güvenli' sayılmaz")
+    }
+
     func testReportWithoutFolderIndexHasNoAppsOrUI() throws {
         let object = try json(DisplayEnvelope(report: try report(nil), rules: try rules()))
         XCTAssertNil(object["apps"])
@@ -102,5 +114,33 @@ final class DisplayEnvelopeTests: XCTestCase {
         XCTAssertEqual(byPath["/Users/me/web/.next"]?["note"] as? String, "aday notu")
         XCTAssertNil(byPath["/Users/me/a/inside"], "covered by a catalog finding")
         XCTAssertNil(byPath["/Users/me/small/.cache"], "below the 150 MB threshold")
+    }
+
+    func testExcludedScannerCandidatesAreNotFindings() throws {
+        var set = try RuleSet.bundled()
+        set.apps = [AppRule(id: "js", name: "JS", tone: "dev", components: [
+            ComponentRule(id: "nm", name: "node_modules", paths: nil, names: ["node_modules"], children: nil, safety: .safe, category: .dependencies,
+                          what: "x nedir", why: text, ifRemoved: text, excludeUnder: ["~/.nvm"])])]
+        var base = try report(["/Users/me/proj": 3 * gb])
+        base.candidates = [Candidate(name: "node_modules", path: "/Users/me/.nvm/v/lib/node_modules", bytes: 400 * mb, logical: 400 * mb,
+                                     category: .dependencies, label: "x", note: "n")]
+        let object = try json(DisplayEnvelope(report: base, rules: set))
+        let findings = try XCTUnwrap((object["ui"] as? [String: Any])?["findings"] as? [[String: Any]])
+        XCTAssertFalse(findings.contains { ($0["path"] as? String)?.contains(".nvm") == true })
+    }
+
+    func testCleanupSectionListsPathsThePolicyAlwaysRejects() throws {
+        var set = try RuleSet.bundled()
+        set.apps = [AppRule(id: "t", name: "Test", tone: "dev", components: [
+            component("caches", ["~/Library/Caches"], safety: .safe, category: .cache), component("npm", ["~/.npm"], safety: .safe, category: .cache)])]
+        let policy = TrashPolicy(home: "/Users/me", applications: nil, protectedPaths: [])
+        let index = ["/Users/me/Library/Caches": 2 * gb, "/Users/me/.npm": gb]
+        let object = try json(DisplayEnvelope(report: try report(index), rules: set, policy: policy, stale: true))
+        let cleanup = try XCTUnwrap(object["cleanup"] as? [String: Any])
+        let blocked = try XCTUnwrap(cleanup["blocked"] as? [String: String])
+        XCTAssertNotNil(blocked["/Users/me/Library/Caches"])
+        XCTAssertNil(blocked["/Users/me/.npm"])
+        XCTAssertEqual(cleanup["stale"] as? Bool, true)
+        XCTAssertNil(try json(DisplayEnvelope(report: try report(index), rules: set))["cleanup"], "politika yoksa bölüm yok")
     }
 }

@@ -4,11 +4,14 @@ public struct ScanRoots: Sendable {
     public var data: String
     public var home: String
     public var excluded: [String]
+    /// Uygulama paketlerinin bulunduğu klasör (yalnızca doğrudan `.app` alt öğeleri taşınabilir).
+    public var applications: String
 
-    public init(data: String, home: String, excluded: [String] = []) {
+    public init(data: String, home: String, excluded: [String] = [], applications: String = "/Applications") {
         self.data = data
         self.home = home
         self.excluded = excluded
+        self.applications = applications
     }
 }
 
@@ -42,16 +45,32 @@ public final class BridgeRouter: @unchecked Sendable {
     private let openFullDiskAccess: @Sendable () -> Void
     private let emit: @Sendable (Data) -> Void
     private let runner: ScanRunner
+    private let trasher: Trasher?
+    private let actionLogURL: URL?
+
+    private struct PendingPlan {
+        var plan: TrashPlan
+        var service: TrashService
+    }
+    private static let planLifetime: TimeInterval = 600
+    private static let maxPlans = 5
+    private static let maxTrashPaths = 200
 
     private let lock = NSLock()
     private var scanning = false
+    private var cleaning = false
     private var cancelRequested = false
+    private var pendingPlans: [String: PendingPlan] = [:]
+    private var cleanedScans = Set<String>()
 
     public init(store: ReportStore, rules: RuleSet, roots: ScanRoots, appInfo: AppInfo,
                 permission: @escaping @Sendable () -> PermissionStatus,
                 openFullDiskAccess: @escaping @Sendable () -> Void,
                 emit: @escaping @Sendable (Data) -> Void,
-                runner: @escaping ScanRunner = BridgeRouter.defaultRunner) {
+                runner: @escaping ScanRunner = BridgeRouter.defaultRunner,
+                trasher: Trasher? = nil, actionLogURL: URL? = nil) {
+        self.trasher = trasher
+        self.actionLogURL = actionLogURL
         self.store = store
         self.rules = rules
         self.classifier = Classifier(rules: rules)
@@ -104,6 +123,9 @@ public final class BridgeRouter: @unchecked Sendable {
             openFullDiskAccess()
             return Data("{}".utf8)
         case "appInfo": return try JSONEncoder().encode(appInfo)
+        case "capabilities": return try JSONEncoder().encode(["cleanup": cleanupEnabled])
+        case "planTrash": return try planTrash(scanId: payload["scanId"] as? String, paths: payload["paths"])
+        case "confirmTrash": return try confirmTrash(planId: payload["planId"] as? String, acknowledge: payload["acknowledgeReview"] as? Bool ?? false)
         default: throw Failure(message: "Bilinmeyen köprü işlemi: \(type)")
         }
     }
@@ -155,7 +177,11 @@ public final class BridgeRouter: @unchecked Sendable {
     private func loadScan(id: String?) throws -> Data {
         guard let id else { throw Failure(message: "Geçersiz tarama kimliği.") }
         do {
-            return try JSONEncoder().encode(DisplayEnvelope(report: try store.load(id: id), rules: rules))
+            lock.lock()
+            let stale = cleanedScans.contains(id)
+            lock.unlock()
+            return try JSONEncoder().encode(DisplayEnvelope(report: try store.load(id: id), rules: rules,
+                                                            policy: cleanupEnabled ? makePolicy() : nil, stale: stale))
         } catch ReportStoreError.invalidID {
             throw Failure(message: "Geçersiz tarama kimliği.")
         } catch ReportStoreError.notFound {
@@ -163,6 +189,107 @@ public final class BridgeRouter: @unchecked Sendable {
         } catch {
             throw Failure(message: "Tarama okunamadı.")
         }
+    }
+
+    // MARK: Temizlik (Çöp Sepeti)
+
+    private var cleanupEnabled: Bool { trasher != nil && actionLogURL != nil }
+
+    private struct PlanResponse: Encodable {
+        var planId: String
+        var items: [TrashPlanItem]
+        var totalBytes: Int64
+        var needsAcknowledge: Bool
+        var acceptedCount: Int
+    }
+
+    private func planTrash(scanId: String?, paths: Any?) throws -> Data {
+        guard let trasher, let actionLogURL else { throw Failure(message: "Temizlik bu kurulumda kapalı.") }
+        guard let scanId else { throw Failure(message: "Geçersiz tarama kimliği.") }
+        guard let requested = paths as? [String] else { throw Failure(message: "Geçersiz yol listesi.") }
+        guard !requested.isEmpty else { throw Failure(message: "Taşımak için en az bir öğe seç.") }
+        guard requested.count <= Self.maxTrashPaths else { throw Failure(message: "Tek seferde en fazla \(Self.maxTrashPaths) öğe taşınabilir.") }
+        try requireIdle()
+
+        let report: Report
+        do { report = try store.load(id: scanId) }
+        catch ReportStoreError.invalidID { throw Failure(message: "Geçersiz tarama kimliği.") }
+        catch ReportStoreError.notFound { throw Failure(message: "Tarama bulunamadı.") }
+        catch { throw Failure(message: "Tarama okunamadı.") }
+
+        // Yetki sunucudadır: izin kümesi ve korumalı yollar taramanın kataloğundan, kök bu bilgisayarın ana klasöründen gelir.
+        let service = TrashService(policy: makePolicy(), trasher: trasher, log: ActionLog(url: actionLogURL))
+        let plan = service.plan(scanId: scanId, requested: requested, allowed: CleanupCatalog.candidates(report: report, rules: rules))
+
+        lock.lock()
+        let now = Date()
+        pendingPlans = pendingPlans.filter { now.timeIntervalSince($0.value.plan.created) < Self.planLifetime }
+        while pendingPlans.count >= Self.maxPlans, let oldest = pendingPlans.min(by: { $0.value.plan.created < $1.value.plan.created }) {
+            pendingPlans[oldest.key] = nil
+        }
+        pendingPlans[plan.id] = PendingPlan(plan: plan, service: service)
+        lock.unlock()
+        return try JSONEncoder().encode(PlanResponse(planId: plan.id, items: plan.items, totalBytes: plan.totalBytes,
+                                                     needsAcknowledge: plan.needsAcknowledge, acceptedCount: plan.acceptedCount))
+    }
+
+    private func makePolicy() -> TrashPolicy {
+        let home = URL(fileURLWithPath: roots.home).standardizedFileURL.path
+        return TrashPolicy(home: home, applications: roots.applications,
+                           protectedPaths: CleanupCatalog.protectedPaths(rules: rules, home: home))
+    }
+
+    private func confirmTrash(planId: String?, acknowledge: Bool) throws -> Data {
+        guard cleanupEnabled else { throw Failure(message: "Temizlik bu kurulumda kapalı.") }
+        lock.lock()
+        if scanning {
+            lock.unlock()
+            throw Failure(message: "Tarama sürerken temizlik yapılamaz.")
+        }
+        if cleaning {
+            lock.unlock()
+            throw Failure(message: "Temizlik sürüyor; bitmesini bekle.")
+        }
+        guard let planId, let pending = pendingPlans[planId],
+              Date().timeIntervalSince(pending.plan.created) < Self.planLifetime else {
+            pendingPlans[planId ?? ""] = nil
+            lock.unlock()
+            throw Failure(message: "Plan bulunamadı veya süresi doldu; öğeleri yeniden seç.")
+        }
+        if pending.plan.needsAcknowledge && !acknowledge {
+            lock.unlock()
+            throw Failure(message: "İncele düzeyindeki öğeler için ek onay gerekiyor.")
+        }
+        pendingPlans[planId] = nil
+        cleaning = true
+        lock.unlock()
+        defer {
+            lock.lock()
+            cleaning = false
+            lock.unlock()
+        }
+        do {
+            let outcome = try pending.service.execute(pending.plan, acknowledgeReview: acknowledge)
+            if outcome.results.contains(where: \.ok) {
+                lock.lock()
+                cleanedScans.insert(pending.plan.scanId)
+                lock.unlock()
+            }
+            return try JSONEncoder().encode(outcome)
+        } catch TrashError.logUnavailable {
+            throw Failure(message: "Temizlik günlüğü yazılamadığı için hiçbir şey taşınmadı.")
+        } catch TrashError.nothingToDo {
+            throw Failure(message: "Taşınacak öğe yok.")
+        } catch TrashError.acknowledgementRequired {
+            throw Failure(message: "İncele düzeyindeki öğeler için ek onay gerekiyor.")
+        }
+    }
+
+    private func requireIdle() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        if scanning { throw Failure(message: "Tarama sürerken temizlik yapılamaz.") }
+        if cleaning { throw Failure(message: "Temizlik sürüyor; bitmesini bekle.") }
     }
 
     private func startScan(scope: String?) throws -> Data {
@@ -176,6 +303,10 @@ public final class BridgeRouter: @unchecked Sendable {
         if scanning {
             lock.unlock()
             throw Failure(message: "Tarama zaten sürüyor.")
+        }
+        if cleaning {
+            lock.unlock()
+            throw Failure(message: "Temizlik sürerken tarama başlatılamaz.")
         }
         scanning = true
         cancelRequested = false

@@ -56,12 +56,14 @@ Plan: `docs/superpowers/plans/2026-10-19-stage4-apps.md` — tamamlandı
 - **Bitti sayılır:** geliştirici olmayan bir Mac'te de anlamlı gruplar çıkıyor; her satır açıklanıyor; bileşenler toplamı ölçülen alanı aşmıyor; Tanınmayan listesi sistem ve tanınmış klasörleri tekrarlamıyor.
 
 ## Aşama 5 — Temizlik (Çöp Sepeti)
-- [ ] `TrashService`: yalnızca `FileManager.trashItem`; yasaklı yollar, `lstat` yeniden kontrol, sembolik bağlantı/volume kontrolü
-- [ ] Güvenlik düzeyleri (`güvenli / incele / asla`) `rules.json`'a işlenir
-- [ ] `planTrash` → `confirmTrash` akışı, onay penceresi, ek onay kutusu (`incele`), satır satır sonuç
-- [ ] `actions.log`; tarama sürerken temizlik kapalı
-- [ ] Üst çubuk metni: "Silme: yalnızca Çöp Sepeti"; "yer açmaz" uyarısı
-- [ ] Testler yalnızca geçici dizinde; kodda `rm`/`removeItem` yok (arama ile doğrulama)
+Plan: `docs/superpowers/plans/2026-10-19-stage5-cleanup.md` — kod tamamlandı; gerçek Çöp Sepeti denemesi kullanıcıda
+- [x] `TrashService`: yalnızca `FileManager.trashItem`; yasaklı yollar, `lstat` yeniden kontrol, sembolik bağlantı/volume kontrolü
+- [x] Güvenlik düzeyleri (`güvenli / incele / asla`) `rules.json`'a işlenir
+- [x] `planTrash` → `confirmTrash` akışı, onay penceresi, ek onay kutusu (`incele`), satır satır sonuç
+- [x] `actions.log`; tarama sürerken temizlik kapalı
+- [x] Üst çubuk metni: "Silme: yalnızca Çöp Sepeti"; "yer açmaz" uyarısı
+- [x] Testler yalnızca geçici dizinde; kodda `rm`/`removeItem` yok (arama ile doğrulama)
+- [ ] **Sizin denemeniz:** uygulamada küçük, güvenli bir öğeyi (örn. bir önbellek klasörü) seçip taşıyın; gerçek Çöp Sepeti'nde görünmesini ve "Geri Koy"un çalışmasını kontrol edin. Testler ve self-test gerçek Çöp Sepeti'ne yazmaz, bu yüzden `trashItem` yalnızca böyle doğrulanır.
 - **Bitti sayılır:** seçilen güvenli öğeler Çöp Sepeti'ne gider, "Geri Koy" çalışır, yasaklı yollar reddedilir.
 
 ## Aşama 6 — Cila ve dağıtım
