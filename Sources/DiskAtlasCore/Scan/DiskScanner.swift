@@ -55,7 +55,8 @@ public final class DiskScanner {
     private static let maxDepth = 8
     private static let maxChildren = 40
     private static let candidateThreshold: Int64 = 10 * 1024 * 1024
-    private static let folderIndexThreshold: Int64 = 1024 * 1024
+    /// `folderIndex`e giren en küçük klasör boyutu; karşılaştırma bu eşiğin altını göremez.
+    public static let folderIndexThreshold: Int64 = 1024 * 1024
     private static let candidateNote = "Yalnızca dosya yoluna göre sınıflandırıldı. İçerik okunmadı; gereksiz olduğu veya yeniden indirilebileceği doğrulanmadı. Alan kesin kazanım değildir."
     private static let candidateLabels: [DiskCategory: String] = [
         .cache: "Önbellek · uygulamayla doğrula",
