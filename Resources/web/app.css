@@ -72,3 +72,5 @@
 .trash-row .badge.safety-incele{background:#fff7e9;border-color:#eddfbf;color:#8f7b52}
 .trash-total{font-weight:600;margin:12px 0 4px}
 .trash-ack{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:11px;line-height:1.5}
+.finding-main .trash-reason{display:block;font-size:9px;color:#8d4a3b;margin-top:2px}
+.component-path .trash-reason{font:9px var(--mono);color:#8d4a3b}

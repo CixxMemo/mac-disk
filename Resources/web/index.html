@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-<meta name="description" content="Mac depolamanı keşfet. Gerçek disk verileriyle çalışan, yerel ve salt okunur bir disk atlası.">
+<meta name="description" content="Mac depolamanı keşfet. Gerçek disk verileriyle çalışan, yerel bir disk atlası.">
 <title>Disk Atlas — Mac depolama analizi</title>
 <link rel="stylesheet" href="app.css">
 </head>
@@ -58,7 +58,7 @@
     <div class="panel-top"><div><h2 class="panel-title" id="findingsTitle">Yakından bakılacaklar</h2><p class="panel-subtitle">Büyük alanları tanı. Kendi inceleme listeni oluştur.</p></div><span id="findingsCount" class="count-pill">0 öğe</span></div>
     <div class="searchbar"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="findingsSearch" type="search" placeholder="Klasör veya uygulama ara…" aria-label="İnceleme listesinde ara"></div>
     <div id="findingsList" class="finding-list"></div>
-    <div class="selection"><div class="selection-summary"><strong id="selectionSize">0 B</strong><span id="selectionCount">0 öğe seçildi</span></div><div class="selection-actions"><button id="clearSelection" class="text-button" disabled>Seçimi temizle</button><button id="copySelection" class="button dark" disabled><svg><use href="#i-copy"/></svg>Listeyi kopyala</button></div><p class="footnote">Seçimler yalnızca bir inceleme listesi oluşturur. Dosyalarda işlem yapılmaz.</p></div>
+    <div class="selection"><div class="selection-summary"><strong id="selectionSize">0 B</strong><span id="selectionCount">0 öğe seçildi</span></div><div class="selection-actions"><button id="clearSelection" class="text-button" disabled>Seçimi temizle</button><button id="copySelection" class="button dark" disabled><svg><use href="#i-copy"/></svg>Listeyi kopyala</button></div><p class="footnote" id="selectionNote">Seçimler yalnızca bir inceleme listesi oluşturur. Dosyalarda işlem yapılmaz.</p></div>
    </aside>
   </div>
  </section>

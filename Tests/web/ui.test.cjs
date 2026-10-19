@@ -476,11 +476,11 @@ const cleanupApps = () => {
   return apps;
 };
 const finding = (name, path, bytes, safety, group) => ({ name, path, bytes, category: 'cache', group, note: 'not', safety });
-const cleanupEnv = async (handlers = {}, { cleanup = true } = {}) => nativeEnv({
+const cleanupEnv = async (handlers = {}, { cleanup = true, extra = {}, apps = cleanupApps() } = {}) => nativeEnv({
   ...(cleanup ? { capabilities: () => ({ cleanup: true }) } : {}),
   listScans: () => [{ id: 'scan-1' }],
-  loadScan: () => makeReport({ apps: cleanupApps(), ui: { homePath: '/Users/test', findings: [
-    finding('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli', 'cache'), finding('Android SDK', '/Users/test/Library', 3e9, 'incele', 'review')] } }),
+  loadScan: () => makeReport({ apps, ui: { homePath: '/Users/test', findings: [
+    finding('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli', 'cache'), finding('Android SDK', '/Users/test/Library', 3e9, 'incele', 'review')] }, ...extra }),
   ...handlers
 });
 const checkboxes = (env, id) => env.get(id).querySelectorAll('input').filter(n => n.type === 'checkbox');
@@ -635,4 +635,77 @@ test('findings with an unknown safety level are rejected', () => {
   const env = boot();
   const bad = makeReport({ ui: { homePath: '/Users/test', findings: [finding('x', '/Users/test/.npm', 2e9, 'sil', 'cache')] } });
   assert.throws(() => env.run(`load(${JSON.stringify(bad)})`), /geçersiz/i);
+});
+
+// ---- Aşama 5: inceleme sonrası düzeltmeler ----
+test('paths the policy always rejects get no checkbox and show their reason', async () => {
+  const extra = { cleanup: { blocked: { '/Users/test/Library': 'Bu klasörün kendisi taşınamaz.' }, stale: false } };
+  const { env } = await cleanupEnv({}, { extra });
+  const boxes = checkboxes(env, 'findingsList');
+  assert.equal(boxes.length, 2);
+  assert(boxes[1].disabled, 'engelli bulgunun kutusu pasif');
+  assert(env.get('findingsList').textContent.includes('Bu klasörün kendisi taşınamaz.'));
+  await env.get('appsNav').click(); await settle();
+  assert.equal(checkboxes(env, 'appsList').length, 3);
+  assert(env.get('appsList').textContent.includes('Bu klasörün kendisi taşınamaz.'));
+});
+
+test('a scan the server marks stale opens with cleanup closed', async () => {
+  const { env } = await cleanupEnv({}, { extra: { cleanup: { blocked: {}, stale: true } } });
+  assert(visible(env, 'staleBar'));
+  tick(checkboxes(env, 'findingsList')[0]);
+  assert(!visible(env, 'cleanupBar'));
+});
+
+test('texts that said nothing can be moved are corrected when cleanup is on', async () => {
+  const { env } = await cleanupEnv();
+  assert(env.get('selectionNote').textContent.includes('Çöp Sepeti'));
+  assert(!env.get('selectionNote').textContent.includes('Dosyalarda işlem yapılmaz'));
+  assert(!checkboxes(env, 'findingsList')[0].attrs['aria-label'].includes('inceleme listesine'));
+  await env.get('helpBtn').click(); await settle();
+  const help = env.get('dialogBody').textContent;
+  assert(help.includes('Çöp Sepeti’ne taşıma') && !help.includes('yalnızca bir liste oluşturursun'), help);
+  assert(!env.html.includes('salt okunur bir disk atlası'), 'meta açıklaması artık salt okunur demez');
+});
+
+test('focus moves to the rescan button when the result dialog closes', async () => {
+  const { env } = await cleanupEnv({ planTrash: () => plan([acceptedItem('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli')]),
+    confirmTrash: () => ({ results: [{ path: '/Users/test/.npm', ok: true }], movedBytes: 2e9, failedCount: 0 }) });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  await env.get('dialogBody').querySelectorAll('button').at(-1).click(); await settle();
+  await env.get('dialogBody').querySelectorAll('button').at(-1).click(); await settle();   // Kapat
+  assert.equal(env.document.activeElement, env.get('staleRescan'));
+});
+
+test('a double click on the move button prepares only one plan', async () => {
+  let resolve; const gate = new Promise(r => { resolve = r; });
+  const { env, bridge } = await cleanupEnv({ planTrash: async () => { await gate; return plan([acceptedItem('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli')]); } });
+  tick(checkboxes(env, 'findingsList')[0]);
+  const first = env.get('cleanupBtn').click(), second = env.get('cleanupBtn').click();
+  resolve(); await first; await second; await settle();
+  assert.equal(bridge.calls.filter(c => c.type === 'planTrash').length, 1);
+});
+
+test('more than 200 selected items are refused before asking Swift', async () => {
+  const apps = { homePath: '/Users/test', recognizedBytes: 1e9, unrecognized: [], apps: [{ id: 'many', name: 'Çok', tone: 'dev', bytes: 1e9, components:
+    Array.from({ length: 201 }, (_, i) => ({ id: 'c' + i, name: 'Bileşen ' + i, bytes: 1e6, paths: ['/Users/test/many/' + i], safety: 'güvenli', category: 'cache', what: 'x nedir', why: 'y neden', ifRemoved: 'z olur' })) }] };
+  const { env, bridge } = await cleanupEnv({}, { apps });
+  await env.get('appsNav').click(); await settle();
+  checkboxes(env, 'appsList').forEach(box => { box.checked = true; box.onchange(); });
+  await env.get('cleanupBtn').click(); await settle();
+  assert(!bridge.calls.some(c => c.type === 'planTrash'));
+  assert(env.get('message').textContent.includes('200'));
+});
+
+test('the scan button is disabled while a move is running', async () => {
+  let resolve; const gate = new Promise(r => { resolve = r; });
+  const { env } = await cleanupEnv({ planTrash: () => plan([acceptedItem('npm önbelleği', '/Users/test/.npm', 2e9, 'güvenli')]),
+    confirmTrash: async () => { await gate; return { results: [{ path: '/Users/test/.npm', ok: true }], movedBytes: 2e9, failedCount: 0 }; } });
+  tick(checkboxes(env, 'findingsList')[0]);
+  await env.get('cleanupBtn').click(); await settle();
+  const running = env.get('dialogBody').querySelectorAll('button').at(-1).click(); await settle();
+  assert(env.get('scanBtn').disabled, 'taşıma sürerken Tara pasif');
+  resolve(); await running; await settle();
+  assert(!env.get('scanBtn').disabled || visible(env, 'staleBar'));
 });
