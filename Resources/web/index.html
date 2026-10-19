@@ -24,7 +24,7 @@
 <div class="app">
 <header class="app-header">
  <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Disk Atlas</div>
- <nav class="navigation" aria-label="Ana gezinme"><button class="nav-btn active" data-view="explorer" aria-current="page">Keşfet</button><button class="nav-btn" data-view="files">Büyük dosyalar</button><button class="nav-btn hidden" id="historyNav" data-view="history">Geçmiş</button><button class="nav-btn" data-view="health">Tarama bilgisi</button></nav>
+ <nav class="navigation" aria-label="Ana gezinme"><button class="nav-btn active" data-view="explorer" aria-current="page">Keşfet</button><button class="nav-btn hidden" id="appsNav" data-view="apps">Uygulamalar</button><button class="nav-btn hidden" id="unrecognizedNav" data-view="unrecognized">Tanınmayan</button><button class="nav-btn" data-view="files">Büyük dosyalar</button><button class="nav-btn hidden" id="historyNav" data-view="history">Geçmiş</button><button class="nav-btn" data-view="health">Tarama bilgisi</button></nav>
  <div class="header-end"><span class="read-only"><svg><use href="#i-shield"/></svg>Salt okunur</span><button class="button dark hidden" id="scanBtn">Tara</button><button class="button" id="importBtn"><svg><use href="#i-import"/></svg>Rapor aç</button></div>
 </header>
 <main class="main">
@@ -63,6 +63,17 @@
   </div>
  </section>
  <section id="view-files" class="view hidden"><div class="panel files-panel"><div class="panel-top"><div><h2 class="panel-title">Büyük dosyalar</h2><p class="panel-subtitle">Ölçümdeki en büyük 150 dosya. Fiziksel ve mantıksal boyutu karşılaştır.</p></div><span id="fileCount" class="count-pill"></span></div><div class="searchbar files-search"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="fileSearch" type="search" placeholder="Dosya adı veya konum ara…" aria-label="Büyük dosyalarda ara"></div><div class="table-scroll"><table class="files-table"><thead><tr><th scope="col">DOSYA / KONUM</th><th scope="col">TÜR</th><th scope="col">MANTIKSAL</th><th scope="col">AYRILAN ALAN</th></tr></thead><tbody id="filesBody"></tbody></table></div></div></section>
+ <section id="view-apps" class="view hidden">
+  <div class="panel apps-panel"><div class="panel-top"><div><h2 class="panel-title">Uygulamalar</h2><p class="panel-subtitle">Büyük alanlar, ait oldukları araç ve uygulamalarla gruplandı. Bir satırı açıp ne olduğunu, neden bu türde sayıldığını ve silinirse ne olacağını oku.</p></div><span id="appsCount" class="count-pill"></span></div>
+   <div class="searchbar"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="appsSearch" type="search" placeholder="Araç, uygulama veya klasör ara…" aria-label="Uygulamalarda ara"></div>
+   <div id="appsList" class="apps-list"></div>
+   <p class="footnote apps-note">Eşleştirme klasör adına ve yoluna göredir; dosya içerikleri okunmaz. Açıklamalar genel bilgidir ve her Mac’te geçerli olmayabilir. Güvenlik rozetleri yalnızca bilgidir; bu sürümde hiçbir şey silinmez.</p></div>
+ </section>
+ <section id="view-unrecognized" class="view hidden">
+  <div class="panel files-panel"><div class="panel-top"><div><h2 class="panel-title">Tanınmayan büyük klasörler</h2><p class="panel-subtitle">Hiçbir araç kuralına girmeyen, kendi payı büyük klasörler. Kendi payı, alt klasörleri çıkarıldıktan sonra kalan boyuttur.</p></div><span id="unrecognizedCount" class="count-pill"></span></div>
+   <div class="searchbar files-search"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="unrecognizedSearch" type="search" placeholder="Klasör ara…" aria-label="Tanınmayan klasörlerde ara"></div>
+   <div class="table-scroll"><table class="files-table unrecognized-table"><thead><tr><th scope="col">KLASÖR</th><th scope="col">BOYUT</th><th scope="col">KENDİ PAYI</th><th scope="col">İŞLEM</th></tr></thead><tbody id="unrecognizedBody"></tbody></table></div></div>
+ </section>
  <section id="view-history" class="view hidden">
   <div class="panel history-panel"><div class="panel-top"><div><h2 class="panel-title">Tarama geçmişi</h2><p class="panel-subtitle">İki tarama seç ve karşılaştır. Kayıtlar yalnızca bu Mac’te durur.</p></div><button class="button dark" id="compareBtn" disabled>Karşılaştır</button></div><div id="historyList" class="history-list"></div></div>
   <div id="compareResult" class="panel compare-panel hidden">

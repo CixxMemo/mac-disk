@@ -1,6 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { boot, settle, fakeBridge, makeReport } = require('./harness.cjs');
+const { boot, settle, fakeBridge, makeReport, makeApps } = require('./harness.cjs');
 
 const visible = (env, id) => !env.get(id).classList.contains('hidden');
 const nativeEnv = async handlers => {
@@ -348,4 +348,113 @@ test('no binary units are shown anywhere in the UI text', () => {
   const stripped = env.html.replace(/<style[\s\S]*?<\/style>/g, '');
   assert(!/\b(GiB|MiB|KiB|TiB)\b/.test(stripped), 'index.html mentions a binary unit');
   assert(!/'(GiB|MiB|KiB|TiB|PiB)'|[0-9] (GiB|MiB|KiB)/.test(env.source), 'app.js mentions a binary unit');
+});
+
+// ---- Uygulamalar ve Tanınmayan ----
+const appsEnv = async (appsOverride, reportOverride = {}) => {
+  const result = await nativeEnv({ listScans: () => [{ id: 'scan-1' }], loadScan: () => makeReport({ apps: makeApps(appsOverride), ...reportOverride }) });
+  return result;
+};
+const appRows = env => env.get('appsList').children;
+const unrecognizedRows = env => env.get('unrecognizedBody').children;
+
+test('apps tabs are visible only when the report has apps', async () => {
+  const { env } = await appsEnv();
+  assert(visible(env, 'appsNav') && visible(env, 'unrecognizedNav'));
+  const plain = await nativeEnv({ listScans: () => [{ id: 'scan-1' }], loadScan: () => makeReport() });
+  assert(!visible(plain.env, 'appsNav') && !visible(plain.env, 'unrecognizedNav'));
+  const fileEnv = boot(); fileEnv.run(`load(${JSON.stringify(makeReport())})`);
+  assert(!visible(fileEnv, 'appsNav') && !visible(fileEnv, 'unrecognizedNav'));
+});
+
+test('apps list shows each tool with size and keeps the delivered order', async () => {
+  const { env } = await appsEnv();
+  await env.get('appsNav').click(); await settle();
+  assert(visible(env, 'view-apps') && !visible(env, 'view-explorer'));
+  assert.equal(appRows(env).length, 2);
+  assert(appRows(env)[0].textContent.includes('Android') && appRows(env)[0].textContent.includes('5,00 GB'), appRows(env)[0].textContent);
+  assert(appRows(env)[1].textContent.includes('JavaScript araçları'));
+});
+
+test('expanding an app shows components with explanations and safety badges', async () => {
+  const { env } = await appsEnv();
+  await env.get('appsNav').click(); await settle();
+  const head = appRows(env)[0].querySelectorAll('button')[0];
+  assert.equal(head.attrs['aria-expanded'], 'false');
+  head.click();
+  assert.equal(head.attrs['aria-expanded'], 'true');
+  const text = appRows(env)[0].textContent;
+  for (const expected of ['Android SDK nedir', 'Android SDK neden bu türde', 'Android SDK silinirse', 'İncele', 'Yeniden oluşturulabilir', 'Nedir', 'Neden bu türde', 'Silinirse ne olur']) {
+    assert(text.includes(expected), expected);
+  }
+  head.click();
+  assert.equal(head.attrs['aria-expanded'], 'false');
+});
+
+test('show on map navigates to the folder when it is in the map and is absent otherwise', async () => {
+  const { env } = await appsEnv();
+  await env.get('appsNav').click(); await settle();
+  appRows(env)[0].querySelectorAll('button')[0].click();
+  const showButtons = buttonsOf(appRows(env)[0], 'Haritada göster');
+  assert.equal(showButtons.length, 1, 'only /Users/test/Library exists in the compact tree');
+  showButtons[0].click();
+  assert(visible(env, 'view-explorer') && !visible(env, 'view-apps'));
+  assert.equal(env.run('current.path'), '/Users/test/Library');
+});
+
+test('apps search filters tools and components', async () => {
+  const { env } = await appsEnv();
+  await env.get('appsNav').click(); await settle();
+  const search = text => { env.get('appsSearch').value = text; env.get('appsSearch').oninput(); };
+  search('sdk');
+  assert.equal(appRows(env).length, 1);
+  assert(appRows(env)[0].textContent.includes('Android SDK') && !appRows(env)[0].textContent.includes('Sanal cihazlar'));
+  search('npm');
+  assert.equal(appRows(env).length, 1);
+  assert(appRows(env)[0].textContent.includes('JavaScript araçları'));
+  search('yokböyleşey');
+  assert(env.get('appsList').textContent.includes('Eşleşen araç yok'));
+});
+
+test('unrecognized table lists folders with own bytes, searches and copies the path', async () => {
+  const { env } = await appsEnv();
+  await env.get('unrecognizedNav').click(); await settle();
+  assert(visible(env, 'view-unrecognized'));
+  assert.equal(unrecognizedRows(env).length, 2);
+  assert(unrecognizedRows(env)[0].textContent.includes('Foo') && unrecognizedRows(env)[0].textContent.includes('900,0 MB'), unrecognizedRows(env)[0].textContent);
+  env.get('unrecognizedSearch').value = 'bar'; env.get('unrecognizedSearch').oninput();
+  assert.equal(unrecognizedRows(env).length, 1);
+  await buttonsOf(unrecognizedRows(env)[0], 'Yolu kopyala')[0].click(); await settle();
+  assert.equal(env.copied(), '/Users/test/Bar');
+});
+
+test('empty states are explained', async () => {
+  const { env } = await appsEnv({ apps: [], unrecognized: [], recognizedBytes: 0 });
+  await env.get('appsNav').click(); await settle();
+  assert(env.get('appsList').textContent.includes('tanınan araç yok'), env.get('appsList').textContent);
+  await env.get('unrecognizedNav').click(); await settle();
+  assert(env.get('unrecognizedBody').textContent.includes('Tanınmayan büyük klasör yok'), env.get('unrecognizedBody').textContent);
+});
+
+test('review list comes from the ui payload when present', async () => {
+  const ui = { homePath: '/Users/test', findings: [{ name: 'Katalog bulgusu', path: '/Users/test/Library', bytes: 3e9, category: 'cache', group: 'cache', note: 'açıklama' }] };
+  const { env } = await appsEnv({}, { ui });
+  const text = env.get('findingsList').textContent;
+  assert(text.includes('Katalog bulgusu'), text);
+  assert(!text.includes('Android SDK'), 'the hard-coded spec list is not used');
+});
+
+test('file mode keeps the old derived findings and shows no apps tabs', () => {
+  const env = boot();
+  env.run(`load(${JSON.stringify(makeReport())})`);
+  assert(!visible(env, 'appsNav'));
+  assert(visible(env, 'dashboard'));
+});
+
+test('switching to a report without apps leaves the apps view', async () => {
+  const { env } = await appsEnv();
+  await env.get('appsNav').click(); await settle();
+  env.run(`load(${JSON.stringify(makeReport())})`);
+  assert(!visible(env, 'view-apps') && visible(env, 'view-explorer'));
+  assert(!visible(env, 'appsNav'));
 });

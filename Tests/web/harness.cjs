@@ -131,4 +131,24 @@ function makeReport(overrides = {}) {
   };
 }
 
-module.exports = { boot, settle, fakeBridge, makeReport, webDir };
+/** Köprünün `loadScan` yanıtındaki `apps` bölümü (Swift AppsReport ile aynı biçim). */
+function makeApps(overrides = {}) {
+  const component = (id, name, bytes, paths, safety) => ({ id, name, bytes, paths, safety, category: 'dependencies', what: `${name} nedir`, why: `${name} neden bu türde`, ifRemoved: `${name} silinirse` });
+  return {
+    homePath: '/Users/test', recognizedBytes: 7e9,
+    apps: [
+      { id: 'android', name: 'Android', tone: 'android', bytes: 5e9, components: [
+        component('android-sdk', 'Android SDK', 3e9, ['/Users/test/Library'], 'incele'),
+        component('android-avd', 'Sanal cihazlar', 2e9, ['/Users/test/.android/avd'], 'güvenli')] },
+      { id: 'js', name: 'JavaScript araçları', tone: 'dev', bytes: 2e9, components: [
+        component('npm-cache', 'npm önbelleği', 2e9, ['/Users/test/.npm'], 'güvenli')] }
+    ],
+    unrecognized: [
+      { path: '/Users/test/Library/Application Support/Foo', bytes: 1e9, ownBytes: 9e8 },
+      { path: '/Users/test/Bar', bytes: 5e8, ownBytes: 5e8 }
+    ],
+    ...overrides
+  };
+}
+
+module.exports = { boot, settle, fakeBridge, makeReport, makeApps, webDir };
