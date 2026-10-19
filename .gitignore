@@ -1,0 +1,7 @@
+reports/
+Disk-Atlas.html
+Disk-Atlas.onceki.html
+*.app
+.build/
+.DS_Store
+*.zip
