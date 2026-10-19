@@ -23,7 +23,7 @@ Object.defineProperty(global, 'copiedText', { get: () => env.copied() });
 async function main() {
   assert(!get('dashboard').classList.contains('hidden'));
   assert(get('welcome').classList.contains('hidden'));
-  assert(get('freeValue').textContent.includes('GiB'));
+  assert(get('freeValue').textContent.includes('GB'));
   assert.equal(run('current.path'), run('home.path'));
   assert(get('treemap').querySelectorAll('button').length > 20);
   assert.equal(get('filesBody').children.length, 150);
@@ -101,7 +101,7 @@ async function main() {
   assert(get('message').textContent.includes('Rapor açılamadı'));
   assert.equal(run('data.tree.path'),pathBefore);
   await get('fileInput').onchange({target:{files:[{size:41*1024**2,text:async()=>{throw Error('must not read oversized file')}}],value:'test'}});
-  assert(get('message').textContent.includes('40 MiB'));
+  assert(get('message').textContent.includes('40 MB'));
   log('full original report import, derived findings, invalid-report preservation and import size limit');
 
   assert(html.includes("connect-src 'none'"));

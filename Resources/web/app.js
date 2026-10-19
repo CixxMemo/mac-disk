@@ -5,7 +5,7 @@ const sourceCategories = ['cache','build','dependencies','models','personal','sy
 let data = null, index = new Map(), ancestors = new Map(), home = null, current = null, mode = 'folders', activeView = 'explorer', selected = new Set(), findings = [], previousFocus = null, toastTimer = null;
 const element = (tag,cls,text) => {const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;};
 function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');const use=document.createElementNS('http://www.w3.org/2000/svg','use');use.setAttribute('href','#i-'+name);svg.append(use);svg.setAttribute('aria-hidden','true');return svg;}
-function amount(value){if(!Number.isFinite(value)||value<0)return ['—',''];if(value<1024)return [String(value),'B'];const units=['KiB','MiB','GiB','TiB','PiB'];let i=-1;do{value/=1024;i++;}while(value>=1024&&i<units.length-1);return [new Intl.NumberFormat('tr-TR',{maximumFractionDigits:1,minimumFractionDigits:value<10?1:0}).format(value),units[i]];}
+function amount(value){if(!Number.isFinite(value)||value<0)return ['—',''];if(value<1000)return [String(value),'B'];const units=['KB','MB','GB','TB','PB'];let i=-1;do{value/=1000;i++;}while(value>=1000&&i<units.length-1);const digits=i>=2?2:1;return [new Intl.NumberFormat('tr-TR',{maximumFractionDigits:digits,minimumFractionDigits:digits}).format(value),units[i]];}
 const format = value => amount(value).join(' ');
 const total = items => items.reduce((sum,item)=>sum+item.bytes,0);
 const shortPath = path => home && (path===home.path||path.startsWith(home.path+'/')) ? '~'+path.slice(home.path.length) : path;
@@ -40,7 +40,7 @@ function load(report){
  function metric(id,bytes){const [value,unit]=amount(bytes);$(id).replaceChildren(document.createTextNode(value),element('span','unit',unit));}
  metric('freeValue',report.disk.free);metric('scannedValue',report.tree.bytes);metric('cacheValue',report.categories.cache+report.categories.build);metric('homeValue',home.bytes);
  $('capacityText').textContent=format(report.disk.total)+' toplam';$('capacityFill').style.width=(report.disk.total?Math.min(100,report.disk.free/report.disk.total*100):0)+'%';
- $('filesText').textContent=report.stats.files.toLocaleString('tr-TR')+' dosya · erişilebilen kapsam';$('homeText').textContent=shortPath(home.path)+' · erişilebilen dosyalar';
+ $('filesText').textContent=report.stats.files.toLocaleString('tr-TR')+' dosya · erişilebilen kapsam';{const unmeasured=report.disk.used-report.tree.bytes;$('unmeasuredText').textContent=report.disk.used>0&&unmeasured>0?'≈ '+format(unmeasured)+' ölçülmedi: macOS sistem birimi, anlık görüntüler, korumalı alanlar':'';}$('homeText').textContent=shortPath(home.path)+' · erişilebilen dosyalar';
  $('legend').replaceChildren(...Object.values(tones).map(t=>{const span=element('span');const dot=element('i');dot.style.background=t.color;span.append(dot,document.createTextNode(t.name));return span;}));
  if(report.demo||report.incomplete||report.fullDiskAccess==='denied'){$('message').textContent=[report.demo?'Örnek veriler Mac’ine ait değildir.':'',report.incomplete?'Kısmi tarama: süre veya kayıt sınırı aşıldı ya da tarama iptal edildi.':'',report.fullDiskAccess==='denied'?'Tam Disk Erişimi olmadan yapıldı; korumalı klasörler ölçülmedi.':''].filter(Boolean).join(' ');$('message').classList.remove('hidden');}
  renderFindings();renderFiles();renderHealth();showView('explorer');
@@ -117,7 +117,7 @@ $('findingsSearch').oninput=renderFindings;$('fileSearch').oninput=renderFiles;
 $('clearSelection').onclick=()=>{selected.clear();renderFindings();renderMap();};$('copySelection').onclick=()=>copyText(selectionText());
 $('coverageBtn').onclick=()=>showView('health');$('helpBtn').onclick=showHelp;
 $('importBtn').onclick=$('welcomeImport').onclick=()=>$('fileInput').click();
-$('fileInput').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>40*1024**2)throw Error('JSON raporu en fazla 40 MiB olabilir.');load(JSON.parse(await file.text()));}catch(error){$('message').textContent='Rapor açılamadı: '+error.message;$('message').classList.remove('hidden');}finally{event.target.value='';}};
+$('fileInput').onchange=async event=>{const file=event.target.files[0];if(!file)return;try{if(file.size>40*1000**2)throw Error('JSON raporu en fazla 40 MB olabilir.');load(JSON.parse(await file.text()));}catch(error){$('message').textContent='Rapor açılamadı: '+error.message;$('message').classList.remove('hidden');}finally{event.target.value='';}};
 $('closeDialog').onclick=closeDialog;$('dialogBackdrop').onclick=event=>{if(event.target===$('dialogBackdrop'))closeDialog();};
 document.addEventListener('keydown',event=>{if($('dialogBackdrop').classList.contains('hidden'))return;if(event.key==='Escape')closeDialog();if(event.key==='Tab'){const buttons=[...$('dialogBackdrop').querySelectorAll('button:not([disabled]),input:not([disabled]),a[href]')];const first=buttons[0],last=buttons.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}});
 new ResizeObserver(()=>{if(data&&activeView==='explorer')requestAnimationFrame(renderMap);}).observe($('treemap'));
@@ -203,7 +203,7 @@ const dateLabel = value => new Date(value).toLocaleString('tr-TR', { day: 'numer
 const signed = delta => (delta > 0 ? '+' : delta < 0 ? '−' : '') + format(Math.abs(delta));
 const filterNames = ['all', 'grew', 'shrank', 'newgone', 'uncertain'];
 const setFilterButtons = () => filterNames.forEach(name => $('filter-' + name).classList.toggle('active', name === compareFilterName));
-const statusLabels = { grew: 'Büyüdü', shrank: 'Küçüldü', new: 'Yeni / 1 MiB üstüne çıktı', gone: 'Kalktı / 1 MiB altına indi', uncertain: 'Belirsiz' };
+const statusLabels = { grew: 'Büyüdü', shrank: 'Küçüldü', new: 'Yeni / ~1 MB üstüne çıktı', gone: 'Kalktı / ~1 MB altına indi', uncertain: 'Belirsiz' };
 async function renderHistory() {
   if (!bridge) return;
   try { historyScans = await bridge.request('listScans'); }
