@@ -7,6 +7,9 @@ public struct ScanSummary: Codable, Equatable, Sendable {
     public var incomplete: Bool
     public var allocatedBytes: Int64
     public var schema: Int
+    public var fullDiskAccess: String?
+    /// Klasör dizini olan (karşılaştırılabilir) tarama mı; alan eksik eski kayıtlar karşılaştırılabilir sayılır.
+    public var comparable: Bool?
 }
 
 public enum ReportStoreError: Error, Equatable {
@@ -48,7 +51,8 @@ public final class ReportStore: @unchecked Sendable {
             id = "\(stem)-\(counter)"
         }
         let summary = ScanSummary(id: id, created: report.created, scope: report.scope, incomplete: report.incomplete,
-                                  allocatedBytes: report.tree.bytes, schema: report.schema)
+                                  allocatedBytes: report.tree.bytes, schema: report.schema,
+                                  fullDiskAccess: report.fullDiskAccess, comparable: report.folderIndex != nil)
         try ReportCodec.encode(report).write(to: file(id, "json"), options: .atomic)
         try JSONEncoder().encode(summary).write(to: file(id, "meta.json"), options: .atomic)
         return id
@@ -64,6 +68,16 @@ public final class ReportStore: @unchecked Sendable {
             return summary
         }
         return summaries.sorted { $0.created != $1.created ? $0.created > $1.created : $0.id > $1.id }
+    }
+
+    /// Yalnızca uygulamanın kendi tarama kaydını (rapor + özet) siler; kullanıcı dosyalarına dokunmaz.
+    public func delete(id: String) throws {
+        guard Self.isValid(id: id) else { throw ReportStoreError.invalidID(id) }
+        lock.lock()
+        defer { lock.unlock() }
+        guard FileManager.default.fileExists(atPath: file(id, "json").path) else { throw ReportStoreError.notFound(id) }
+        try FileManager.default.removeItem(at: file(id, "meta.json"))
+        try FileManager.default.removeItem(at: file(id, "json"))
     }
 
     public func load(id: String) throws -> Report {

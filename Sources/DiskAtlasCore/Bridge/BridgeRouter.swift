@@ -95,12 +95,58 @@ public final class BridgeRouter: @unchecked Sendable {
             return Data("{}".utf8)
         case "listScans": return try JSONEncoder().encode(store.list())
         case "loadScan": return try loadScan(id: payload["id"] as? String)
+        case "deleteScan": return try deleteScan(id: payload["id"] as? String)
+        case "compare": return try compare(older: payload["older"] as? String, newer: payload["newer"] as? String)
         case "permissionStatus": return try JSONEncoder().encode(["status": permission().rawValue])
         case "openFullDiskAccess":
             openFullDiskAccess()
             return Data("{}".utf8)
         case "appInfo": return try JSONEncoder().encode(appInfo)
         default: throw Failure(message: "Bilinmeyen köprü işlemi: \(type)")
+        }
+    }
+
+    private func deleteScan(id: String?) throws -> Data {
+        guard let id else { throw Failure(message: "Geçersiz tarama kimliği.") }
+        do {
+            try store.delete(id: id)
+            return Data("{}".utf8)
+        } catch ReportStoreError.invalidID {
+            throw Failure(message: "Geçersiz tarama kimliği.")
+        } catch ReportStoreError.notFound {
+            throw Failure(message: "Tarama bulunamadı.")
+        } catch {
+            throw Failure(message: "Tarama silinemedi.")
+        }
+    }
+
+    private struct CompareResponse: Encodable {
+        var olderId: String
+        var newerId: String
+        var olderCreated: String
+        var newerCreated: String
+        var diff: ScanDiff
+    }
+
+    /// Kullanıcı hangisini önce seçerse seçsin eski/yeni `created`'a göre belirlenir.
+    private func compare(older: String?, newer: String?) throws -> Data {
+        guard let older, let newer else { throw Failure(message: "Karşılaştırmak için iki tarama seç.") }
+        guard older != newer else { throw Failure(message: "İki farklı tarama seç.") }
+        func load(_ id: String) throws -> Report {
+            do { return try store.load(id: id) }
+            catch ReportStoreError.invalidID { throw Failure(message: "Geçersiz tarama kimliği.") }
+            catch ReportStoreError.notFound { throw Failure(message: "Tarama bulunamadı.") }
+            catch { throw Failure(message: "Tarama okunamadı.") }
+        }
+        var pair = [(id: older, report: try load(older)), (id: newer, report: try load(newer))]
+        if pair[0].report.created > pair[1].report.created { pair.swapAt(0, 1) }
+        do {
+            let diff = try Differ.compare(older: pair[0].report, newer: pair[1].report)
+            return try JSONEncoder().encode(CompareResponse(olderId: pair[0].id, newerId: pair[1].id,
+                                                            olderCreated: pair[0].report.created,
+                                                            newerCreated: pair[1].report.created, diff: diff))
+        } catch let error as DiffError {
+            throw Failure(message: error.description)
         }
     }
 
