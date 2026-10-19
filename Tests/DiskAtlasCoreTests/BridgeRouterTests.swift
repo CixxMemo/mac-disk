@@ -210,4 +210,73 @@ final class BridgeRouterTests: XCTestCase {
             log = EventLog()
         }
     }
+
+    // MARK: Geçmiş: compare ve deleteScan
+
+    private func saveScan(created: String, index: [String: Int64]?) throws -> String {
+        var report = try fixtureReport()
+        report.schema = 2
+        report.created = created
+        report.folderIndex = index
+        report.tree.bytes = index?.values.reduce(0, +) ?? 0
+        return try store.save(report)
+    }
+
+    func testCompareOrdersByCreatedAndReturnsDiff() throws {
+        let mib: Int64 = 1024 * 1024
+        let older = try saveScan(created: "2026-10-18T08:00:00.000000+00:00", index: ["/a": 10 * mib])
+        let newer = try saveScan(created: "2026-10-19T08:00:00.000000+00:00", index: ["/a": 14 * mib])
+        let router = try makeRouter()
+        let response = try send(router, "compare", ["older": newer, "newer": older])  // kasıtlı ters sırada
+        XCTAssertEqual(response["ok"] as? Bool, true)
+        let data = try XCTUnwrap(response["data"] as? [String: Any])
+        XCTAssertEqual(data["olderId"] as? String, older)
+        XCTAssertEqual(data["newerId"] as? String, newer)
+        XCTAssertEqual(data["olderCreated"] as? String, "2026-10-18T08:00:00.000000+00:00")
+        let diff = try XCTUnwrap(data["diff"] as? [String: Any])
+        let items = try XCTUnwrap(diff["items"] as? [[String: Any]])
+        XCTAssertEqual(items.count, 1)
+        XCTAssertEqual(items[0]["path"] as? String, "/a")
+        XCTAssertEqual((items[0]["delta"] as? NSNumber)?.int64Value, 4 * mib)
+        XCTAssertEqual(items[0]["status"] as? String, "grew")
+    }
+
+    func testCompareRejectsSameInvalidAndMissingIDs() throws {
+        let id = try saveScan(created: "2026-10-18T08:00:00.000000+00:00", index: [:])
+        let router = try makeRouter()
+        assertError(try send(router, "compare", ["older": id, "newer": id]), contains: "İki farklı")
+        assertError(try send(router, "compare", ["older": id, "newer": "../x"]), contains: "Geçersiz")
+        assertError(try send(router, "compare", ["older": id, "newer": "scan-999"]), contains: "bulunamadı")
+        assertError(try send(router, "compare", ["older": id]))
+        assertError(try send(router, "compare", ["older": 1, "newer": 2]))
+    }
+
+    func testCompareLegacyScanGivesClearError() throws {
+        let legacy = try saveScan(created: "2026-10-17T08:00:00.000000+00:00", index: nil)
+        let good = try saveScan(created: "2026-10-19T08:00:00.000000+00:00", index: ["/a": 2_000_000])
+        assertError(try send(try makeRouter(), "compare", ["older": legacy, "newer": good]), contains: "karşılaştırma için gerekli")
+    }
+
+    func testDeleteScanRemovesFromListAndRejectsBadIDs() throws {
+        let keep = try saveScan(created: "2026-10-18T08:00:00.000000+00:00", index: [:])
+        let drop = try saveScan(created: "2026-10-19T08:00:00.000000+00:00", index: [:])
+        let router = try makeRouter()
+        XCTAssertEqual(try send(router, "deleteScan", ["id": drop])["ok"] as? Bool, true)
+        let list = try XCTUnwrap(try send(router, "listScans")["data"] as? [[String: Any]])
+        XCTAssertEqual(list.map { $0["id"] as? String }, [keep])
+        assertError(try send(router, "deleteScan", ["id": drop]), contains: "bulunamadı")
+        for bad in ["../x", "/etc/passwd", ""] { assertError(try send(router, "deleteScan", ["id": bad]), contains: "Geçersiz") }
+        assertError(try send(router, "deleteScan"))
+    }
+
+    func testDeleteScanWorksWhileScanning() throws {
+        let saved = try saveScan(created: "2026-10-18T08:00:00.000000+00:00", index: [:])
+        let gate = DispatchSemaphore(value: 0)
+        let report = try fixtureReport()
+        let router = try makeRouter(runner: { _, _, _, _ in gate.wait(); return report })
+        XCTAssertEqual(try send(router, "startScan", ["scope": "data"])["ok"] as? Bool, true)
+        XCTAssertEqual(try send(router, "deleteScan", ["id": saved], id: "2")["ok"] as? Bool, true)
+        gate.signal()
+        XCTAssertNotNil(log.wait(for: "scanDone"))
+    }
 }
