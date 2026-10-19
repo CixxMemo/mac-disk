@@ -11,6 +11,11 @@
     <key>CFBundleVersion</key><string>{{VERSION}}</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
+    <key>NSDesktopFolderUsageDescription</key><string>Disk Atlas, Masaüstü klasörünün ne kadar yer kapladığını ölçmek için dosya adlarını ve boyutlarını okur. Dosya içeriklerini açmaz.</string>
+    <key>NSDocumentsFolderUsageDescription</key><string>Disk Atlas, Belgeler klasörünün ne kadar yer kapladığını ölçmek için dosya adlarını ve boyutlarını okur. Dosya içeriklerini açmaz.</string>
+    <key>NSDownloadsFolderUsageDescription</key><string>Disk Atlas, İndirilenler klasörünün ne kadar yer kapladığını ölçmek için dosya adlarını ve boyutlarını okur. Dosya içeriklerini açmaz.</string>
+    <key>NSRemovableVolumesUsageDescription</key><string>Disk Atlas, harici disklerdeki boyutları ölçmek için dosya adlarını ve boyutlarını okur. Dosya içeriklerini açmaz.</string>
+    <key>NSNetworkVolumesUsageDescription</key><string>Disk Atlas, ağ disklerindeki boyutları ölçmek için dosya adlarını ve boyutlarını okur. Dosya içeriklerini açmaz.</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict>

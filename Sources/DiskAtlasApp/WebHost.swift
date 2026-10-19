@@ -1,5 +1,6 @@
 import AppKit
 import WebKit
+import UniformTypeIdentifiers
 import DiskAtlasCore
 
 /// `WKWebView` + `diskatlas://` şeması + köprü. Yalnızca paketteki arayüzü yükler; harici gezinme iptal edilir.
@@ -114,6 +115,18 @@ final class WebHost: NSObject, WKNavigationDelegate, WKUIDelegate, WKURLSchemeHa
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? { nil }
+
+    /// "Rapor aç": yalnızca .json dosyaları seçilebilir; içerik JS'e dosya olarak verilir, yol verilmez.
+    func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping ([URL]?) -> Void) {
+        guard frame.securityOrigin.protocol == Self.scheme else { return completionHandler(nil) }
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.message = "Bir Disk Atlas JSON raporu seç"
+        panel.begin { response in completionHandler(response == .OK ? panel.urls : nil) }
+    }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         debug("didFinish")

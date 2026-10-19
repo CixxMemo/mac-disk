@@ -133,11 +133,12 @@ public final class BridgeRouter: @unchecked Sendable {
         cancelRequested = false
         lock.unlock()
 
-        let options = ScanOptions(root: root, excludedPaths: roots.excluded + [store.directoryPath])
+        let options = ScanOptions(root: root, excludedPaths: roots.excluded + [store.directoryPath], progressInterval: 1)
+        let access = permission()
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             let finalEvent: [String: Any]
             do {
-                let report = try runner(options, classifier, { [self] in
+                var report = try runner(options, classifier, { [self] in
                     lock.lock()
                     defer { lock.unlock() }
                     return cancelRequested
@@ -145,6 +146,7 @@ public final class BridgeRouter: @unchecked Sendable {
                     send(["event": "scanProgress", "records": progress.records, "errors": progress.errors,
                           "folder": progress.currentPath, "elapsed": progress.elapsed])
                 })
+                report.fullDiskAccess = access.rawValue
                 finalEvent = ["event": "scanDone", "id": try store.save(report)]
             } catch let failure as ScanFailure {
                 finalEvent = ["event": "scanFailed", "message": failure.description]

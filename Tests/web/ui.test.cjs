@@ -43,7 +43,7 @@ test('scan button sends startScan and progress events update the text', async ()
   assert(env.get('scanBtn').disabled);
   await env.run("window.diskAtlasEvent({event:'scanProgress',records:1234,errors:2,folder:'/Users/x',elapsed:3.2})"); await settle();
   const text = env.get('scanProgressText').textContent;
-  assert(text.includes('1.234') && text.includes('/Users/x'), text);
+  assert(text.includes('1.234') && text.includes('/Users/x') && text.startsWith('00:03'), text);
 });
 
 test('scanDone loads the saved report and shows the dashboard', async () => {
@@ -90,4 +90,41 @@ test('file mode hides the scan button and keeps the import flow', async () => {
   await env.ready(); await settle();
   assert(!visible(env, 'scanBtn') && !visible(env, 'welcomeNative'));
   assert(visible(env, 'welcome') && visible(env, 'welcomeFile'));
+});
+
+test('a saved scan with denied permission keeps a persistent banner with the settings button', async () => {
+  const { env, bridge } = await nativeEnv({ permissionStatus: () => ({ status: 'denied' }), listScans: () => [{ id: 'scan-1' }], loadScan: () => makeReport() });
+  assert(visible(env, 'dashboard') && visible(env, 'permissionBanner'));
+  await env.get('openSettingsBanner').click(); await settle();
+  assert(bridge.calls.some(c => c.type === 'openFullDiskAccess'));
+});
+
+test('granted permission hides the banner and a new scan hides it while scanning', async () => {
+  const granted = await nativeEnv({ listScans: () => [{ id: 'scan-1' }], loadScan: () => makeReport() });
+  assert(visible(granted.env, 'dashboard') && !visible(granted.env, 'permissionBanner'));
+  const denied = await nativeEnv({ permissionStatus: () => ({ status: 'denied' }), listScans: () => [{ id: 'scan-1' }], loadScan: () => makeReport(), startScan: () => ({ started: true }) });
+  await denied.env.get('scanBtn').click(); await settle();
+  assert(!visible(denied.env, 'permissionBanner'));
+});
+
+test('a scan made without Full Disk Access is marked partial', async () => {
+  const { env } = await nativeEnv({ listScans: () => [{ id: 'scan-1' }], loadScan: () => makeReport({ fullDiskAccess: 'denied' }) });
+  assert(visible(env, 'message'));
+  assert(env.get('message').textContent.includes('Tam Disk Erişimi'), env.get('message').textContent);
+});
+
+test('a user-cancelled or limited scan is described as partial without blaming a limit', async () => {
+  const { env } = await nativeEnv({ listScans: () => [{ id: 'scan-1' }], loadScan: () => makeReport({ incomplete: true }) });
+  assert(env.get('message').textContent.includes('iptal'), env.get('message').textContent);
+});
+
+test('native help describes scanning instead of claiming the page never touches the disk', async () => {
+  const { env } = await nativeEnv();
+  await env.get('helpBtn').click();
+  const text = env.get('dialogBody').textContent;
+  assert(text.includes('yalnızca adını, yolunu ve boyutunu okur'), text);
+  assert(!text.includes('diske kendiliğinden erişmez'), text);
+  const fileEnv = boot();
+  await fileEnv.get('helpBtn').click();
+  assert(fileEnv.get('dialogBody').textContent.includes('diske kendiliğinden erişmez'));
 });

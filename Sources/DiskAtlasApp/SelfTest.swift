@@ -32,14 +32,24 @@ final class SelfTest {
             _ = try await evaluate("document.getElementById('scanBtn').click()")
             let deadline = Date().addingTimeInterval(config.timeout - 5)
             while Date() < deadline {
-                if try await evaluate("!document.getElementById('dashboard').classList.contains('hidden')") as? Bool == true { break }
-                if try await evaluate("!document.getElementById('message').classList.contains('hidden')") as? Bool == true {
-                    results["message"] = try await evaluate("document.getElementById('message').textContent")
+                // Durum tek sorguda okunur: iki ayrı sorgu arasında ekran değişebilir.
+                let state = try await evaluate("""
+                ({ dashboard: !document.getElementById('dashboard').classList.contains('hidden'),
+                   scanning: !document.getElementById('scanning').classList.contains('hidden'),
+                   message: document.getElementById('message').classList.contains('hidden') ? '' : document.getElementById('message').textContent })
+                """) as? [String: Any] ?? [:]
+                let dashboard = state["dashboard"] as? Bool == true
+                let scanning = state["scanning"] as? Bool == true
+                let message = state["message"] as? String ?? ""
+                if dashboard && !scanning { break }
+                if !dashboard && !scanning && !message.isEmpty {
+                    results["message"] = message
                     return finish(ok: false, reason: "tarama hata mesajı gösterdi")
                 }
                 try await Task.sleep(nanoseconds: 200_000_000)
             }
             results["dashboardVisible"] = try await evaluate("!document.getElementById('dashboard').classList.contains('hidden')")
+            results["message"] = try await evaluate("document.getElementById('message').classList.contains('hidden') ? '' : document.getElementById('message').textContent")
             results["scannedValue"] = try await evaluate("document.getElementById('scannedValue').textContent")
             results["filesText"] = try await evaluate("document.getElementById('filesText').textContent")
             results["scanMeta"] = try await evaluate("document.getElementById('scanMeta').textContent")
@@ -57,6 +67,7 @@ final class SelfTest {
     }
 
     @MainActor private func snapshot(to path: String) async throws {
+        try await Task.sleep(nanoseconds: 600_000_000)  // requestAnimationFrame ile çizilen harita için
         let image = try await host.webView.takeSnapshot(configuration: WKSnapshotConfiguration())
         guard let tiff = image.tiffRepresentation, let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else {
             throw Failure(message: "Ekran görüntüsü PNG'ye çevrilemedi.")

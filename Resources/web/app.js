@@ -42,7 +42,7 @@ function load(report){
  $('capacityText').textContent=format(report.disk.total)+' toplam';$('capacityFill').style.width=(report.disk.total?Math.min(100,report.disk.free/report.disk.total*100):0)+'%';
  $('filesText').textContent=report.stats.files.toLocaleString('tr-TR')+' dosya · erişilebilen kapsam';$('homeText').textContent=shortPath(home.path)+' · erişilebilen dosyalar';
  $('legend').replaceChildren(...Object.values(tones).map(t=>{const span=element('span');const dot=element('i');dot.style.background=t.color;span.append(dot,document.createTextNode(t.name));return span;}));
- if(report.demo||report.incomplete){$('message').textContent=[report.demo?'Örnek veriler Mac’ine ait değildir.':'',report.incomplete?'Kısmi tarama: süre veya kayıt sınırına ulaşıldı.':''].filter(Boolean).join(' ');$('message').classList.remove('hidden');}
+ if(report.demo||report.incomplete||report.fullDiskAccess==='denied'){$('message').textContent=[report.demo?'Örnek veriler Mac’ine ait değildir.':'',report.incomplete?'Kısmi tarama: süre veya kayıt sınırı aşıldı ya da tarama iptal edildi.':'',report.fullDiskAccess==='denied'?'Tam Disk Erişimi olmadan yapıldı; korumalı klasörler ölçülmedi.':''].filter(Boolean).join(' ');$('message').classList.remove('hidden');}
  renderFindings();renderFiles();renderHealth();showView('explorer');
 }
 function showView(view){if(!['explorer','files','health'].includes(view))return;if(!data){showToast('Önce bir disk raporu aç.');return;}activeView=view;document.querySelectorAll('.view').forEach(node=>node.classList.toggle('hidden',node.id!=='view-'+view));document.querySelectorAll('.nav-btn').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});if(view==='explorer')requestAnimationFrame(renderMap);}
@@ -106,7 +106,8 @@ function showDetails(item){
  const node=index.get(item.path),actions=element('div','detail-actions');if(!item.aggregate&&!item.categoryView){if(node?.children?.length){const explore=element('button','button dark','Haritada keşfet');explore.onclick=()=>{closeDialog();goTo(node);};actions.append(explore);}const copy=element('button','button','Yolu kopyala');copy.onclick=()=>copyText(item.path);actions.append(copy);if(reference){const select=element('button','button',selected.has(item.path)?'Listeden çıkar':'İnceleme listeme ekle');select.onclick=()=>{if(selected.has(item.path))selected.delete(item.path);else selected.add(item.path);select.textContent=selected.has(item.path)?'Listeden çıkar':'İnceleme listeme ekle';renderFindings();renderMap();};actions.append(select);}}body.append(actions);
  if(!item.aggregate&&!item.categoryView&&node?.children?.length){const children=element('div','detail-children');children.append(element('p','panel-subtitle','Bu konumdaki en büyük alt öğeler'));for(const child of node.children.slice(0,6)){const button=element('button','detail-child');button.append(element('span','',child.name),element('strong','',format(child.bytes)),icon('right'));button.onclick=()=>showDetails(child);children.append(button);}body.append(children);}
 }
-function showHelp(){const body=openDialog('Yerel bir harita. Net bir bakış.','NASIL ÇALIŞIR?');const help=element('div','help-content');const sections=[['Gerçek ölçüm, yerel görünüm','Bu arayüz mevcut Disk Atlas JSON taramasını gösterir. HTML sayfası diske kendiliğinden erişmez. Üstteki tarih, verilerin ölçüldüğü zamanı belirtir.'],['Haritayı keşfet','Klasörler alanlarıyla orantılı çizilir; alt klasörler aynı blok içinde görünür. Bir bloğa tıkla, klasör yoluyla geri dön veya Türler görünümünü aç. Haritadaki küçük öğeler birleştirilir; ölçülen toplamları korunur.'],['Kendi inceleme listen','Sağdaki kutuları işaretleyerek yalnızca bir liste oluşturursun. Listeyi kopyalamak dosyalarda işlem yapmaz. Bir üst klasör ve onun alt klasörü birlikte seçilirse alan bir kez sayılır.'],['Boyutları doğru yorumla','Ayrılan alan, dosyanın diskte kapladığı blokların toplamıdır. Mantıksal boyut farklı olabilir. APFS klonları, korumalı alanlar ve anlık görüntüler nedeniyle bu rapor tam disk toplamıyla eşit olmak zorunda değildir.'],['Yeni veriyle güncelle','Yeni bir Disk Atlas JSON raporu oluştuğunda Rapor aç düğmesiyle seçebilirsin. Rapor tarayıcı belleğinde işlenir; sunucuya gönderilmez. Mevcut taramadan arayüzü yeniden oluşturmak için proje klasöründe python3 -B build_ui.py çalıştırılabilir.']];for(const [title,text] of sections)help.append(element('h3','',title),element('p','',text));body.append(help);}
+function showHelp(){const body=openDialog('Yerel bir harita. Net bir bakış.','NASIL ÇALIŞIR?');const help=element('div','help-content');const sections=[['Gerçek ölçüm, yerel görünüm','Bu arayüz mevcut Disk Atlas JSON taramasını gösterir. HTML sayfası diske kendiliğinden erişmez. Üstteki tarih, verilerin ölçüldüğü zamanı belirtir.'],['Haritayı keşfet','Klasörler alanlarıyla orantılı çizilir; alt klasörler aynı blok içinde görünür. Bir bloğa tıkla, klasör yoluyla geri dön veya Türler görünümünü aç. Haritadaki küçük öğeler birleştirilir; ölçülen toplamları korunur.'],['Kendi inceleme listen','Sağdaki kutuları işaretleyerek yalnızca bir liste oluşturursun. Listeyi kopyalamak dosyalarda işlem yapmaz. Bir üst klasör ve onun alt klasörü birlikte seçilirse alan bir kez sayılır.'],['Boyutları doğru yorumla','Ayrılan alan, dosyanın diskte kapladığı blokların toplamıdır. Mantıksal boyut farklı olabilir. APFS klonları, korumalı alanlar ve anlık görüntüler nedeniyle bu rapor tam disk toplamıyla eşit olmak zorunda değildir.'],['Yeni veriyle güncelle','Yeni bir Disk Atlas JSON raporu oluştuğunda Rapor aç düğmesiyle seçebilirsin. Rapor tarayıcı belleğinde işlenir; sunucuya gönderilmez. Mevcut taramadan arayüzü yeniden oluşturmak için proje klasöründe python3 -B build_ui.py çalıştırılabilir.']];if(bridge){sections[0]=['Gerçek ölçüm, yerel görünüm','Disk Atlas, Tara dediğinde Mac’indeki dosyaların yalnızca adını, yolunu ve boyutunu okur; dosyaların içine bakmaz. Sonuçlar bu Mac’te kalır, ağa hiçbir şey gönderilmez. Üstteki tarih, verilerin ölçüldüğü zamanı belirtir.'];sections[4]=['Taramalar ve izin','Her tarama bu Mac’e kaydedilir ve uygulama açıldığında en sonuncusu gösterilir. Tam Disk Erişimi olmadan korumalı klasörler okunamaz ve sonuç kısmi olur. Eski Python raporlarını Rapor aç düğmesiyle de görüntüleyebilirsin.'];}
+ for(const [title,text] of sections)help.append(element('h3','',title),element('p','',text));body.append(help);}
 function showToast(text){clearTimeout(toastTimer);$('toast').textContent=text;$('toast').classList.remove('hidden');toastTimer=setTimeout(()=>$('toast').classList.add('hidden'),3500);}
 async function copyText(text){try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);else{const area=element('textarea');area.value=text;area.style.position='fixed';area.style.left='-9999px';document.body.append(area);area.select();const copied=document.execCommand('copy');area.remove();if(!copied)throw Error('clipboard');}showToast('Kopyalandı. Dosyalarda işlem yapılmadı.');}catch{showToast('Tarayıcı kopyalamayı engelledi. Kopyalamak için metni seçebilirsin.');}}
 function selectionText(){return 'Disk Atlas — yalnızca inceleme listesi\nÖlçüm: '+data.created+'\nKesin kazanılacak alan veya silme talimatı değildir.\n\n'+uniqueSelection().map(item=>item.path+' | '+format(item.bytes)).join('\n')+'\n\nToplam ayrılan alan: '+format(total(uniqueSelection()));}
@@ -134,12 +135,18 @@ const bridge = (() => {
     }
   };
 })();
-let scanning = false;
+let scanning = false, permissionState = 'unknown';
+const clock = seconds => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
+function updatePermissionBanner() {
+  const dashboardShown = !$('dashboard').classList.contains('hidden');
+  $('permissionBanner').classList.toggle('hidden', !bridge || permissionState === 'granted' || !dashboardShown || scanning);
+}
 const showMessage = text => { $('message').textContent = text; $('message').classList.remove('hidden'); };
-function showIdleScreen() { if (data) $('dashboard').classList.remove('hidden'); else $('welcome').classList.remove('hidden'); }
+function showIdleScreen() { if (data) $('dashboard').classList.remove('hidden'); else $('welcome').classList.remove('hidden'); updatePermissionBanner(); }
 function setScanning(on) {
   scanning = on; $('scanning').classList.toggle('hidden', !on); $('scanBtn').disabled = on;
   if (on) { $('welcome').classList.add('hidden'); $('dashboard').classList.add('hidden'); $('message').classList.add('hidden'); }
+  updatePermissionBanner();
 }
 async function startScan() {
   if (!bridge || scanning) return;
@@ -151,10 +158,10 @@ async function cancelScan() {
   try { await bridge.request('cancelScan'); $('scanProgressText').textContent = 'Tarama durduruluyor…'; }
   catch (error) { showMessage('Tarama durdurulamadı: ' + error.message); }
 }
-async function openSavedScan(id) { load(await bridge.request('loadScan', { id })); }
+async function openSavedScan(id) { load(await bridge.request('loadScan', { id })); updatePermissionBanner(); }
 window.diskAtlasEvent = async event => {
   if (event.event === 'scanProgress') {
-    $('scanProgressText').textContent = event.records.toLocaleString('tr-TR') + ' kayıt · ' + event.errors.toLocaleString('tr-TR') + ' erişilemeyen · ' + event.folder;
+    $('scanProgressText').textContent = clock(event.elapsed) + ' · ' + event.records.toLocaleString('tr-TR') + ' kayıt · ' + event.errors.toLocaleString('tr-TR') + ' erişilemeyen · ' + event.folder;
   } else if (event.event === 'scanDone') {
     setScanning(false);
     try { await openSavedScan(event.id); } catch (error) { showMessage('Rapor açılamadı: ' + error.message); showIdleScreen(); }
@@ -165,12 +172,16 @@ window.diskAtlasEvent = async event => {
 function renderPermission(status) {
   const texts = {
     granted: ['Tam Disk Erişimi var', 'Tüm klasörler okunabilir; tarama eksiksiz olur.'],
-    denied: ['Tam Disk Erişimi yok', 'Mail, Mesajlar, Safari gibi korumalı klasörler okunamaz, bu yüzden tarama kısmi olacak. İstersen Ayarlar’da Disk Atlas’a Tam Disk Erişimi ver ve uygulamayı yeniden aç.'],
+    denied: ['Tam Disk Erişimi yok', 'Mail, Mesajlar, Safari gibi korumalı klasörler okunamaz, bu yüzden tarama kısmi olacak. Ayrıca macOS Masaüstü, Belgeler ve İndirilenler için ayrı izin sorabilir. İstersen Ayarlar’da Disk Atlas’a Tam Disk Erişimi ver ve uygulamayı yeniden aç. Uygulamayı güncellediysen izin açık görünse de çalışmayabilir; Disk Atlas’ı listede kapatıp yeniden aç.'],
     unknown: ['Tam Disk Erişimi bilinmiyor', 'İzin durumu belirlenemedi. Tarama yine çalışır; korumalı klasörler okunamazsa sonuç kısmi olur.']
   };
   const [title, text] = texts[status] || texts.unknown;
   $('permissionTitle').textContent = title; $('permissionText').textContent = text;
   $('openSettingsBtn').classList.toggle('hidden', status === 'granted');
+  permissionState = status;
+  $('bannerTitle').textContent = status === 'denied' ? 'Tam Disk Erişimi yok.' : 'Tam Disk Erişimi bilinmiyor.';
+  $('bannerText').textContent = status === 'denied' ? 'Korumalı klasörler okunamaz; yeni taramalar kısmi olur.' : 'İzin durumu belirlenemedi; yeni taramalar kısmi olabilir.';
+  updatePermissionBanner();
 }
 async function bootNative() {
   $('scanBtn').classList.remove('hidden'); $('welcomeFile').classList.add('hidden'); $('welcomeNative').classList.remove('hidden');
@@ -185,5 +196,5 @@ async function bootNative() {
 }
 $('scanBtn').onclick = $('startScanBtn').onclick = startScan;
 $('cancelScanBtn').onclick = cancelScan;
-$('openSettingsBtn').onclick = () => bridge?.request('openFullDiskAccess').catch(error => showMessage('Ayarlar açılamadı: ' + error.message));
+$('openSettingsBtn').onclick = $('openSettingsBanner').onclick = () => bridge?.request('openFullDiskAccess').catch(error => showMessage('Ayarlar açılamadı: ' + error.message));
 window.diskAtlasReady = bridge ? bootNative() : Promise.resolve($('welcome').classList.remove('hidden'));

@@ -182,6 +182,7 @@ final class BridgeRouterTests: XCTestCase {
         XCTAssertEqual(options.root, tree.path("home"))
         XCTAssertTrue(options.excludedPaths.contains("/excluded"))
         XCTAssertTrue(options.excludedPaths.contains(store.directoryPath))
+        XCTAssertLessThanOrEqual(options.progressInterval, 1, "ilerleme en az saniyede bir bildirilmeli")
     }
 
     func testProgressEventsAreForwarded() throws {
@@ -196,5 +197,17 @@ final class BridgeRouterTests: XCTestCase {
         XCTAssertEqual(event["errors"] as? Int, 3)
         XCTAssertEqual(event["folder"] as? String, "/Users/x")
         XCTAssertEqual(event["elapsed"] as? Double, 1.5)
+    }
+
+    func testSavedReportRecordsFullDiskAccessAtScanTime() throws {
+        let report = try fixtureReport()
+        for (status, expected) in [(PermissionStatus.denied, "denied"), (.granted, "granted")] {
+            let router = try makeRouter(permission: { status }, runner: { _, _, _, _ in report })
+            XCTAssertEqual(try send(router, "startScan", ["scope": "data"], id: expected)["ok"] as? Bool, true)
+            let done = try XCTUnwrap(log.wait(for: "scanDone"))
+            let id = try XCTUnwrap(done["id"] as? String)
+            XCTAssertEqual(try store.load(id: id).fullDiskAccess, expected)
+            log = EventLog()
+        }
     }
 }
