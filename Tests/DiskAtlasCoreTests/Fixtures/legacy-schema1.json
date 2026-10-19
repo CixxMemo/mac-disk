@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "app": "Disk Atlas",
+  "demo": false,
+  "created": "2026-10-17T20:39:38.770478+00:00",
+  "scope": "/",
+  "platform": "darwin",
+  "incomplete": false,
+  "seconds": 1.5,
+  "disk": {"total": 1000000, "free": 400000, "used": 600000},
+  "tree": {
+    "name": "Data",
+    "path": "/",
+    "bytes": 12288,
+    "logical": 10000,
+    "category": "personal",
+    "children": [
+      {"name": "a.txt", "path": "/a.txt", "bytes": 4096, "logical": 3000, "category": "personal"},
+      {"name": "node_modules", "path": "/node_modules", "bytes": 8192, "logical": 7000, "category": "dependencies"}
+    ]
+  },
+  "categories": {"cache": 0, "build": 0, "dependencies": 8192, "models": 0, "personal": 4096, "system": 0},
+  "candidates": [
+    {"name": "node_modules", "path": "/node_modules", "bytes": 8192, "logical": 7000, "category": "dependencies",
+     "label": "Bağımlılık · inceleme gerekli",
+     "note": "Yalnızca dosya yoluna göre sınıflandırıldı. İçerik okunmadı; gereksiz olduğu veya yeniden indirilebileceği doğrulanmadı. Alan kesin kazanım değildir."}
+  ],
+  "largest": [
+    {"name": "x.bin", "path": "/node_modules/x.bin", "bytes": 8192, "logical": 7000, "category": "dependencies"}
+  ],
+  "stats": {"entries": 5, "files": 2, "folders": 2, "errors": 1, "symlinks": 0, "otherMounts": 0, "cloudPlaceholders": 0, "hardlinkRepeats": 0},
+  "errors": [{"path": "/gizli", "reason": "PermissionError: Operation not permitted"}],
+  "measurement": {
+    "unit": "bytes",
+    "allocated": "st_blocks * 512",
+    "scopeRoot": "/System/Volumes/Data",
+    "directoryBlocksIncluded": false,
+    "hardlinksCountedOnce": true,
+    "symlinksFollowed": false,
+    "otherVolumesFollowed": false,
+    "fileContentsOpened": false,
+    "treeDepth": 8,
+    "maxChildren": 40,
+    "caveat": "APFS shared clone extents may be counted more than once; protected data and snapshots are outside the scan."
+  }
+}
