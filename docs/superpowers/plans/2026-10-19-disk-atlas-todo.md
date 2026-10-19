@@ -23,17 +23,18 @@ Ayrıntılı plan: `docs/superpowers/plans/2026-10-19-stage1-core.md`
 - **Bitti sayılır:** `swift test` yeşil; `/Applications` üzerinde Swift ve Python toplamı %0,1 içinde; gerçek Python raporu içe aktarılıyor.
 
 ## Aşama 2 — Uygulama kabuğu
-Plan 1. aşamadan sonra yazılır.
-- [ ] Web arayüzünü `Resources/web/` altında `index.html`, `app.css`, `app.js` olarak böl; `FileBackend` ile mevcut davranışı koru
-- [ ] `verify_ui.cjs`'i yeni dosya yapısına uyarla
-- [ ] `ReportStore`: taramaları `~/Library/Application Support/DiskAtlas/scans/` altına kaydet, listele, yükle
-- [ ] Swift uygulama kabuğu: pencere, menü, `WKWebView`, paketten yükleme, dış gezinmeyi engelleme
-- [ ] Köprü: mesaj doğrulama, `startScan`, `cancelScan`, `scanProgress/Done/Failed`, `permissionStatus`, `openFullDiskAccess`
-- [ ] Ekranlar: karşılama/izin rehberi, tarama ilerlemesi (iptal), pano
-- [ ] Tarama bilgisi sayfasında macOS ve uygulama sürümü (kuzenin ekran görüntüsüyle hata ayıklamak için)
-- [ ] `scripts/build_app.sh`: `.app` paketi, ad-hoc imza, zip
-- [ ] Kendi Mac'inizde `.app`'i aç, tara, ekran görüntüsüyle kontrol
-- [ ] İlk kurulum simülasyonu (kendi Mac'inizde): karantina bayrağı verilmiş `.app` ile Gatekeeper uyarısı, Tam Disk Erişimi verilmemiş durumda rehber ekranı ve "kısmi tarama" işareti
+Plan: `docs/superpowers/plans/2026-10-19-stage2-shell.md`
+- [x] Web arayüzünü `Resources/web/` altında `index.html`, `app.css`, `app.js` olarak böl; `FileBackend` ile mevcut davranışı koru
+- [x] `verify_ui.cjs`'i yeni dosya yapısına uyarla
+- [x] `ReportStore`: taramaları `~/Library/Application Support/DiskAtlas/scans/` altına kaydet, listele, yükle
+- [x] Swift uygulama kabuğu: pencere, menü, `WKWebView`, paketten yükleme, dış gezinmeyi engelleme
+- [x] Köprü: mesaj doğrulama, `startScan`, `cancelScan`, `scanProgress/Done/Failed`, `permissionStatus`, `openFullDiskAccess`
+- [x] Ekranlar: karşılama/izin rehberi, tarama ilerlemesi (iptal), pano
+- [x] Tarama bilgisi sayfasında macOS ve uygulama sürümü (kuzenin ekran görüntüsüyle hata ayıklamak için)
+- [x] `scripts/build_app.sh`: `.app` paketi, ad-hoc imza, zip
+- [x] Kendi Mac'inizde `.app`'i aç, tara, ekran görüntüsüyle kontrol
+- [x] İlk kurulum simülasyonu (kendi Mac'inizde): karantina bayrağı verilmiş `.app` ile Gatekeeper uyarısı, Tam Disk Erişimi verilmemiş durumda rehber ekranı ve "kısmi tarama" işareti
+- [ ] **Sizin denemeniz:** `dist/DiskAtlas.app`'i Finder'dan aç, Tam Disk Erişimi vermeden gerçek bir tarama yap (macOS izin pencereleri çıkabilir), "Rapor aç" düğmesini dene. Kod tarafı otomatik testlerle doğrulandı; bu iki şey etkileşimli olduğu için yalnızca siz doğrulayabilirsiniz.
 - **Bitti sayılır:** `.app` kendi Mac'inizde açılıyor, tarıyor ve izin yokken doğru davranıyor. Kuzene bu aşamada gönderilmez.
 
 ## Aşama 3 — Geçmiş ve karşılaştırma
