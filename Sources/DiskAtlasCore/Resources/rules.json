@@ -1,12 +1,916 @@
 {
-  "stickyCategories": ["cache", "build", "dependencies", "models"],
-  "rules": [
-    {"category": "system", "appBundleUnder": "/applications/"},
-    {"category": "models", "pathContainsAny": ["/.lmstudio/models", "/.ollama/models", "/.cache/huggingface"]},
-    {"category": "dependencies", "nameIn": ["node_modules", ".venv", "venv", "bower_components"]},
-    {"category": "build", "nameIn": [".next", ".nuxt", ".svelte-kit", ".turbo", "__pycache__", "deriveddata"]},
-    {"category": "cache", "nameIn": [".cache", "_cacache", "caches", "cache", "gpucache", "code cache"]},
-    {"category": "system", "pathPrefixAny": ["/applications", "/library", "/system", "/usr", "/private", "/opt"]}
+  "stickyCategories": [
+    "cache",
+    "build",
+    "dependencies",
+    "models"
   ],
-  "fallback": "personal"
+  "rules": [
+    {
+      "category": "system",
+      "appBundleUnder": "/applications/"
+    },
+    {
+      "category": "models",
+      "pathContainsAny": [
+        "/.lmstudio/models",
+        "/.ollama/models",
+        "/.cache/huggingface"
+      ]
+    },
+    {
+      "category": "dependencies",
+      "nameIn": [
+        "node_modules",
+        ".venv",
+        "venv",
+        "bower_components"
+      ]
+    },
+    {
+      "category": "build",
+      "nameIn": [
+        ".next",
+        ".nuxt",
+        ".svelte-kit",
+        ".turbo",
+        "__pycache__",
+        "deriveddata"
+      ]
+    },
+    {
+      "category": "cache",
+      "nameIn": [
+        ".cache",
+        "_cacache",
+        "caches",
+        "cache",
+        "gpucache",
+        "code cache"
+      ]
+    },
+    {
+      "category": "system",
+      "pathPrefixAny": [
+        "/applications",
+        "/library",
+        "/system",
+        "/usr",
+        "/private",
+        "/opt"
+      ]
+    }
+  ],
+  "fallback": "personal",
+  "apps": [
+    {
+      "id": "android",
+      "name": "Android",
+      "tone": "android",
+      "components": [
+        {
+          "id": "android-sdk",
+          "name": "Android SDK",
+          "paths": [
+            "~/Library/Android/sdk"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Android uygulamalarını derlemek için gereken araçlar, platform sürümleri ve sistem imajları.",
+          "why": "Geliştirme aracı bileşenidir; yeniden indirilebilir ama büyüktür ve indirmesi uzun sürer.",
+          "ifRemoved": "Android Studio veya Flutter ile Android uygulaması derlenemez; SDK Manager ile yeniden indirilebilir."
+        },
+        {
+          "id": "android-avd",
+          "name": "Android sanal cihazları (AVD)",
+          "paths": [
+            "~/.android/avd"
+          ],
+          "safety": "incele",
+          "category": "build",
+          "what": "Emülatörde çalışan sanal Android cihazların disk imajları ve anlık durum kayıtları.",
+          "why": "Geliştirme için oluşturulmuş sanal cihaz verisidir; kişisel dosyalarınız değildir.",
+          "ifRemoved": "Silinen sanal cihazlar Android Studio üzerinden yeniden oluşturulur; içlerindeki uygulama verileri kaybolur."
+        },
+        {
+          "id": "android-other",
+          "name": "Android ayarları ve önbellek",
+          "paths": [
+            "~/.android"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Android araçlarının ayar, anahtar ve önbellek dosyaları (sanal cihazlar hariç).",
+          "why": "Android geliştirme araçlarına ait yerel veridir.",
+          "ifRemoved": "Ayarlar ve önbellek yeniden oluşur. Hata ayıklama anahtarları dışında, burada yayın imzalama anahtarı tutuyorsanız silmeden önce kontrol edin."
+        }
+      ]
+    },
+    {
+      "id": "xcode",
+      "name": "Xcode ve iOS simülatörleri",
+      "tone": "android",
+      "components": [
+        {
+          "id": "xcode-derived-data",
+          "name": "Xcode DerivedData",
+          "paths": [
+            "~/Library/Developer/Xcode/DerivedData"
+          ],
+          "safety": "güvenli",
+          "category": "build",
+          "what": "Xcode’un projeleri derlerken ürettiği ara dosyalar ve dizinler.",
+          "why": "Derleme çıktısıdır; kaynak koddan yeniden üretilir.",
+          "ifRemoved": "Sonraki derleme daha uzun sürer; başka bir şey kaybolmaz."
+        },
+        {
+          "id": "xcode-archives",
+          "name": "Xcode arşivleri",
+          "paths": [
+            "~/Library/Developer/Xcode/Archives"
+          ],
+          "safety": "incele",
+          "category": "build",
+          "what": "App Store’a göndermek için alınan uygulama arşivleri (.xcarchive).",
+          "why": "Yayınladığınız sürümlerin sembol bilgilerini içerebilir.",
+          "ifRemoved": "Eski sürümler için çökme raporlarını okunur hale getirmek zorlaşabilir; arşiv yeniden üretilemez."
+        },
+        {
+          "id": "xcode-device-support",
+          "name": "iOS cihaz desteği",
+          "paths": [
+            "~/Library/Developer/Xcode/iOS DeviceSupport"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Bağladığınız iPhone/iPad sürümleri için Xcode’un indirdiği hata ayıklama sembolleri.",
+          "why": "Cihaz bağlanınca yeniden indirilen bir önbellektir.",
+          "ifRemoved": "Cihaz bir sonraki bağlanışta semboller yeniden indirilir (zaman alabilir)."
+        },
+        {
+          "id": "simulator-devices",
+          "name": "iOS simülatör cihazları",
+          "paths": [
+            "~/Library/Developer/CoreSimulator/Devices"
+          ],
+          "safety": "incele",
+          "category": "build",
+          "what": "Simülatörde çalışan sanal iPhone/iPad’lerin verileri ve yüklü uygulamaları.",
+          "why": "Geliştirme için oluşturulmuş sanal cihaz verisidir.",
+          "ifRemoved": "Simülatördeki uygulama verileri kaybolur; cihazlar Xcode üzerinden yeniden oluşturulur."
+        },
+        {
+          "id": "simulator-caches",
+          "name": "Simülatör önbelleği",
+          "paths": [
+            "~/Library/Developer/CoreSimulator/Caches"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Simülatör çalışma zamanlarının paylaşılan, önbelleğe alınmış dosyaları (dyld).",
+          "why": "Simülatör açılırken yeniden üretilen bir önbellektir.",
+          "ifRemoved": "Simülatörün ilk açılışı daha uzun sürer."
+        },
+        {
+          "id": "xcode-app",
+          "name": "Xcode uygulaması",
+          "paths": [
+            "/Applications/Xcode.app"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Apple’ın geliştirme ortamı, derleyicileri ve SDK’ları.",
+          "why": "Yüklü bir uygulamadır; büyük olduğu için ayrıca listelenir.",
+          "ifRemoved": "iOS/macOS uygulaması geliştirilemez; App Store’dan yeniden yüklenebilir."
+        }
+      ]
+    },
+    {
+      "id": "javascript",
+      "name": "JavaScript araçları",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "npm-cache",
+          "name": "npm önbelleği",
+          "paths": [
+            "~/.npm"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "npm’in indirdiği paketlerin yerel önbelleği.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Sonraki npm install paketleri yeniden indirir; projelerinize dokunulmaz."
+        },
+        {
+          "id": "yarn-pnpm-cache",
+          "name": "Yarn ve pnpm önbelleği",
+          "paths": [
+            "~/Library/Caches/Yarn",
+            "~/Library/pnpm",
+            "~/.pnpm-store",
+            "~/Library/Caches/pnpm"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Yarn ve pnpm paket yöneticilerinin indirdiği paketlerin önbelleği.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Sonraki kurulumlar paketleri yeniden indirir."
+        },
+        {
+          "id": "node-modules",
+          "name": "node_modules klasörleri",
+          "names": [
+            "node_modules"
+          ],
+          "safety": "güvenli",
+          "category": "dependencies",
+          "what": "Projelerinizin kullandığı JavaScript paketlerinin kurulu kopyaları.",
+          "why": "package.json dosyasından yeniden kurulabilen bağımlılıklardır.",
+          "ifRemoved": "Projeyi çalıştırmak için yeniden npm install gerekir; kaynak kodunuza dokunulmaz."
+        }
+      ]
+    },
+    {
+      "id": "python",
+      "name": "Python",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "pip-cache",
+          "name": "pip önbelleği",
+          "paths": [
+            "~/Library/Caches/pip"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "pip’in indirdiği paketlerin önbelleği.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Sonraki pip kurulumları paketleri yeniden indirir."
+        },
+        {
+          "id": "pycache",
+          "name": "__pycache__ klasörleri",
+          "names": [
+            "__pycache__"
+          ],
+          "safety": "güvenli",
+          "category": "build",
+          "what": "Python’un derlenmiş ara dosyalarını sakladığı klasörler.",
+          "why": "Python kaynak koddan kendisi yeniden üretir.",
+          "ifRemoved": "Python dosyaları ilk çalıştırmada yeniden derlenir; başka bir şey olmaz."
+        },
+        {
+          "id": "python-venv",
+          "name": "Python sanal ortamları",
+          "names": [
+            ".venv",
+            "venv"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Projelerin kendi Python paketlerini ve yorumlayıcısını içeren sanal ortamları.",
+          "why": "Projeye bağlı bağımlılıklardır; gereksinim dosyasından yeniden kurulabilir.",
+          "ifRemoved": "Proje, sanal ortam yeniden kurulana kadar çalışmaz."
+        },
+        {
+          "id": "conda",
+          "name": "Conda ortamları",
+          "paths": [
+            "~/miniconda3",
+            "~/anaconda3",
+            "~/miniforge3",
+            "~/.conda"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Conda ile kurulan Python sürümleri, paketler ve ortamlar.",
+          "why": "Bilimsel Python ortamlarını barındıran büyük bir kurulumdur.",
+          "ifRemoved": "Bu ortamlara bağlı projeler çalışmaz; ortamlar yeniden kurulmalıdır."
+        }
+      ]
+    },
+    {
+      "id": "gradle-maven",
+      "name": "Gradle ve Maven",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "gradle-caches",
+          "name": "Gradle önbelleği",
+          "paths": [
+            "~/.gradle/caches"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Gradle’ın indirdiği bağımlılıklar ve derleme önbelleği.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Sonraki derleme bağımlılıkları yeniden indirir; derleme daha uzun sürer."
+        },
+        {
+          "id": "maven-repo",
+          "name": "Maven yerel deposu",
+          "paths": [
+            "~/.m2/repository"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Maven’ın indirdiği Java kütüphanelerinin yerel deposu.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Sonraki derleme kütüphaneleri yeniden indirir."
+        }
+      ]
+    },
+    {
+      "id": "flutter-dart",
+      "name": "Flutter ve Dart",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "pub-cache",
+          "name": "Dart/Flutter paket önbelleği",
+          "paths": [
+            "~/.pub-cache"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Dart ve Flutter paketlerinin indirilmiş kopyaları.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Sonraki flutter pub get paketleri yeniden indirir."
+        }
+      ]
+    },
+    {
+      "id": "rust",
+      "name": "Rust",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "cargo-registry",
+          "name": "Cargo paket önbelleği",
+          "paths": [
+            "~/.cargo/registry"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Cargo’nun indirdiği Rust paketlerinin kaynakları ve indeksleri.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Sonraki derleme paketleri yeniden indirir."
+        },
+        {
+          "id": "rustup",
+          "name": "Rust araç zincirleri",
+          "paths": [
+            "~/.rustup"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "rustup ile kurulan Rust derleyicileri ve standart kütüphaneler.",
+          "why": "Geliştirme aracıdır; yeniden kurulabilir.",
+          "ifRemoved": "Rust projeleri derlenemez; rustup ile yeniden kurulur."
+        }
+      ]
+    },
+    {
+      "id": "homebrew",
+      "name": "Homebrew",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "brew-packages",
+          "name": "Homebrew paketleri",
+          "paths": [
+            "/opt/homebrew"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Homebrew ile kurulan komut satırı araçları ve kütüphaneler.",
+          "why": "Kurduğunuz araçların kendisidir.",
+          "ifRemoved": "Kurulu araçlar çalışmaz; brew ile yeniden kurulmaları gerekir."
+        },
+        {
+          "id": "brew-cache",
+          "name": "Homebrew önbelleği",
+          "paths": [
+            "~/Library/Caches/Homebrew"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Homebrew’un indirdiği paket dosyalarının önbelleği.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Sonraki kurulum ve güncellemeler dosyaları yeniden indirir."
+        }
+      ]
+    },
+    {
+      "id": "docker",
+      "name": "Docker",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "docker-data",
+          "name": "Docker verileri",
+          "paths": [
+            "~/Library/Containers/com.docker.docker"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Docker Desktop’ın imajlarını, konteynerlerini ve birimlerini tutan sanal disk.",
+          "why": "Yerel konteyner ortamınızın tamamıdır.",
+          "ifRemoved": "Yerel imajlar ve konteynerler silinir; birimlerdeki veriler kaybolabilir."
+        }
+      ]
+    },
+    {
+      "id": "vscode",
+      "name": "VS Code",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "vscode-extensions",
+          "name": "VS Code eklentileri",
+          "paths": [
+            "~/.vscode/extensions"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "VS Code’a kurduğunuz eklentiler ve birlikte gelen araçlar.",
+          "why": "Yeniden kurulabilir ama hangilerini kullandığınızı yalnızca siz bilirsiniz.",
+          "ifRemoved": "Eklentiler kaybolur; Marketplace’ten yeniden kurulabilir."
+        },
+        {
+          "id": "vscode-data",
+          "name": "VS Code uygulama verisi",
+          "paths": [
+            "~/Library/Application Support/Code"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "VS Code’un ayarları, çalışma alanı durumu, yedekleri ve geçmiş verileri.",
+          "why": "Kişiselleştirmelerinizi ve kaydedilmemiş çalışma durumunu içerebilir.",
+          "ifRemoved": "Ayarlarınız ve çalışma alanı durumunuz sıfırlanabilir."
+        },
+        {
+          "id": "vscode-cache",
+          "name": "VS Code önbelleği",
+          "paths": [
+            "~/Library/Caches/com.microsoft.VSCode",
+            "~/Library/Application Support/Code/CachedData"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "VS Code’un hızlı açılması için sakladığı önbellek dosyaları.",
+          "why": "Yeniden üretilen bir önbellektir.",
+          "ifRemoved": "VS Code’un ilk açılışı biraz yavaşlar."
+        }
+      ]
+    },
+    {
+      "id": "jetbrains",
+      "name": "JetBrains",
+      "tone": "dev",
+      "components": [
+        {
+          "id": "jetbrains-cache",
+          "name": "JetBrains önbelleği",
+          "paths": [
+            "~/Library/Caches/JetBrains"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "IntelliJ, PyCharm, Android Studio gibi araçların dizin ve önbellek dosyaları.",
+          "why": "Yeniden üretilen bir önbellektir.",
+          "ifRemoved": "Projeler ilk açılışta yeniden dizinlenir; bu biraz zaman alır."
+        },
+        {
+          "id": "jetbrains-data",
+          "name": "JetBrains uygulama verisi",
+          "paths": [
+            "~/Library/Application Support/JetBrains"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "JetBrains araçlarının ayarları, eklentileri ve kayıtlı yapılandırmaları.",
+          "why": "Kişiselleştirmelerinizi içerir.",
+          "ifRemoved": "Ayarlar ve eklentiler sıfırlanır."
+        }
+      ]
+    },
+    {
+      "id": "ai-models",
+      "name": "Yerel yapay zekâ modelleri",
+      "tone": "ai",
+      "components": [
+        {
+          "id": "lmstudio",
+          "name": "LM Studio",
+          "paths": [
+            "~/.lmstudio"
+          ],
+          "safety": "incele",
+          "category": "models",
+          "what": "LM Studio’nun indirdiği dil modelleri ve çalışma bileşenleri.",
+          "why": "İndirdiğiniz yapay zekâ modellerinin büyük dosyalarını içerir.",
+          "ifRemoved": "Modeller silinir; yeniden indirmek uzun sürebilir."
+        },
+        {
+          "id": "ollama",
+          "name": "Ollama",
+          "paths": [
+            "~/.ollama"
+          ],
+          "safety": "incele",
+          "category": "models",
+          "what": "Ollama’nın indirdiği yerel dil modelleri.",
+          "why": "İndirdiğiniz yapay zekâ modellerinin büyük dosyalarını içerir.",
+          "ifRemoved": "Modeller silinir; ollama pull ile yeniden indirilir."
+        },
+        {
+          "id": "huggingface",
+          "name": "Hugging Face önbelleği",
+          "paths": [
+            "~/.cache/huggingface"
+          ],
+          "safety": "incele",
+          "category": "models",
+          "what": "Hugging Face kütüphanelerinin indirdiği modeller ve veri kümeleri.",
+          "why": "Yapay zekâ modellerinin ve veri kümelerinin önbelleğidir.",
+          "ifRemoved": "Modeller bir sonraki kullanımda yeniden indirilir."
+        }
+      ]
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "tone": "ai",
+      "components": [
+        {
+          "id": "gemini-cli",
+          "name": "Gemini komut satırı aracı",
+          "paths": [
+            "~/.gemini"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Gemini komut satırı aracının ayarları, oturum geçmişi ve önbellek verileri.",
+          "why": "Aracın yerel çalışma verisidir.",
+          "ifRemoved": "Ayarlar ve oturum geçmişi sıfırlanır."
+        }
+      ]
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "tone": "ai",
+      "components": [
+        {
+          "id": "claude-app",
+          "name": "Claude uygulama verisi",
+          "paths": [
+            "~/Library/Application Support/Claude"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Claude uygulamasının yerel verileri; büyük olasılıkla bir sanal makine imajı da içerir.",
+          "why": "Uygulamanın çalışması için kullandığı yerel veridir.",
+          "ifRemoved": "Uygulama ayarları ve yerel veriler sıfırlanır; sanal makine imajı gerektiğinde yeniden oluşturulabilir."
+        }
+      ]
+    },
+    {
+      "id": "chrome",
+      "name": "Google Chrome",
+      "tone": "cache",
+      "components": [
+        {
+          "id": "chrome-cache",
+          "name": "Chrome önbelleği",
+          "paths": [
+            "~/Library/Caches/Google/Chrome"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Chrome’un sitelerden sakladığı geçici dosyalar.",
+          "why": "Yeniden indirilen bir önbellektir.",
+          "ifRemoved": "Siteler ilk ziyarette biraz daha yavaş açılır."
+        },
+        {
+          "id": "chrome-model",
+          "name": "Chrome yerel yapay zekâ modeli",
+          "paths": [
+            "~/Library/Application Support/Google/Chrome/OptGuideOnDeviceModel"
+          ],
+          "safety": "incele",
+          "category": "models",
+          "what": "Chrome’un cihaz üzerinde çalışan yapay zekâ özellikleri için indirdiği model.",
+          "why": "Tarayıcının indirdiği büyük bir model dosyasıdır.",
+          "ifRemoved": "Chrome gerekirse modeli yeniden indirir; ilgili özellikler o sürede çalışmayabilir."
+        },
+        {
+          "id": "chrome-profile",
+          "name": "Chrome profil verisi",
+          "paths": [
+            "~/Library/Application Support/Google/Chrome"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Chrome’un profilleri: yer imleri, geçmiş, oturumlar, kayıtlı parolalar ve eklentiler.",
+          "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
+          "ifRemoved": "Yer imleri, oturumlar ve kayıtlı veriler kaybolabilir."
+        }
+      ]
+    },
+    {
+      "id": "safari",
+      "name": "Safari",
+      "tone": "cache",
+      "components": [
+        {
+          "id": "safari-cache",
+          "name": "Safari önbelleği",
+          "paths": [
+            "~/Library/Caches/com.apple.Safari"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Safari’nin sitelerden sakladığı geçici dosyalar.",
+          "why": "Yeniden indirilen bir önbellektir.",
+          "ifRemoved": "Siteler ilk ziyarette biraz daha yavaş açılır."
+        },
+        {
+          "id": "safari-data",
+          "name": "Safari verisi",
+          "paths": [
+            "~/Library/Safari"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Safari’nin geçmişi, yer imleri ve oturum verileri.",
+          "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
+          "ifRemoved": "Geçmiş ve yer imleri kaybolabilir."
+        }
+      ]
+    },
+    {
+      "id": "spotify",
+      "name": "Spotify",
+      "tone": "cache",
+      "components": [
+        {
+          "id": "spotify-cache",
+          "name": "Spotify önbelleği",
+          "paths": [
+            "~/Library/Caches/com.spotify.client"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Spotify’ın hızlı açılış ve çevrimdışı dinleme için sakladığı müzik önbelleği.",
+          "why": "Yeniden indirilebilen bir önbellektir.",
+          "ifRemoved": "Şarkılar yeniden indirilir; çevrimdışı indirmeleriniz silinebilir."
+        }
+      ]
+    },
+    {
+      "id": "other-caches",
+      "name": "Diğer uygulama önbellekleri",
+      "tone": "cache",
+      "components": [
+        {
+          "id": "caches-other",
+          "name": "Uygulama önbellekleri",
+          "paths": [
+            "~/Library/Caches"
+          ],
+          "safety": "güvenli",
+          "category": "cache",
+          "what": "Uygulamaların hızlı çalışmak için sakladığı geçici dosyalar.",
+          "why": "Önbelleklerin yeniden üretilebileceği varsayılır; her uygulama bunu kendisi yönetir.",
+          "ifRemoved": "Uygulamalar ilk açılışta önbelleği yeniden oluşturur; bazıları kısa süre yavaşlayabilir."
+        }
+      ]
+    },
+    {
+      "id": "personal",
+      "name": "Kişisel klasörler",
+      "tone": "personal",
+      "components": [
+        {
+          "id": "documents",
+          "name": "Belgeler",
+          "paths": [
+            "~/Documents"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Belgeleriniz, projeleriniz ve kaydettiğiniz dosyalar.",
+          "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
+          "ifRemoved": "Dosyalarınız kalıcı olarak kaybolabilir."
+        },
+        {
+          "id": "desktop",
+          "name": "Masaüstü",
+          "paths": [
+            "~/Desktop"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Masaüstünüzdeki dosyalar ve klasörler.",
+          "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
+          "ifRemoved": "Dosyalarınız kalıcı olarak kaybolabilir."
+        },
+        {
+          "id": "downloads",
+          "name": "İndirilenler",
+          "paths": [
+            "~/Downloads"
+          ],
+          "safety": "incele",
+          "category": "personal",
+          "what": "İnternetten indirdiğiniz dosyalar, kurulum paketleri ve arşivler.",
+          "why": "Çoğu yeniden indirilebilir ama hangilerinin gerekli olduğunu yalnızca siz bilirsiniz.",
+          "ifRemoved": "Dosyalar silinir; yeniden indirilemeyenler kaybolur."
+        },
+        {
+          "id": "movies",
+          "name": "Filmler",
+          "paths": [
+            "~/Movies"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Videolarınız ve film projeleriniz.",
+          "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
+          "ifRemoved": "Videolarınız kalıcı olarak kaybolabilir."
+        },
+        {
+          "id": "music",
+          "name": "Müzik",
+          "paths": [
+            "~/Music"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Müzik kütüphaneniz ve ses projeleriniz.",
+          "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
+          "ifRemoved": "Müzik dosyalarınız kalıcı olarak kaybolabilir."
+        },
+        {
+          "id": "pictures",
+          "name": "Resimler",
+          "paths": [
+            "~/Pictures"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Fotoğraflarınız ve Fotoğraflar kütüphaneniz.",
+          "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
+          "ifRemoved": "Fotoğraflarınız kalıcı olarak kaybolabilir."
+        }
+      ]
+    },
+    {
+      "id": "mail-messages",
+      "name": "Posta ve mesajlar",
+      "tone": "personal",
+      "components": [
+        {
+          "id": "mail",
+          "name": "Mail",
+          "paths": [
+            "~/Library/Mail"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Mail uygulamasının e-postaları ve ekleri.",
+          "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
+          "ifRemoved": "E-postalarınız ve ekleriniz yerelde kaybolabilir."
+        },
+        {
+          "id": "messages",
+          "name": "Mesajlar",
+          "paths": [
+            "~/Library/Messages"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Mesajlar uygulamasının konuşmaları ve ekleri.",
+          "why": "Kişisel verinizdir; Disk Atlas’ın dokunmayacağı bir klasördür.",
+          "ifRemoved": "Konuşmalarınız ve ekleriniz yerelde kaybolabilir."
+        }
+      ]
+    },
+    {
+      "id": "backups-trash",
+      "name": "Yedekler ve Çöp Sepeti",
+      "tone": "personal",
+      "components": [
+        {
+          "id": "ios-backups",
+          "name": "iPhone/iPad yedekleri",
+          "paths": [
+            "~/Library/Application Support/MobileSync/Backup"
+          ],
+          "safety": "incele",
+          "category": "personal",
+          "what": "Bu Mac’e aldığınız iPhone ve iPad yedekleri.",
+          "why": "Cihazlarınızın tek yedeği olabilir.",
+          "ifRemoved": "Yedekler silinir; cihazı geri yüklemeniz gerekirse yedek kalmaz."
+        },
+        {
+          "id": "trash",
+          "name": "Çöp Sepeti",
+          "paths": [
+            "~/.Trash"
+          ],
+          "safety": "incele",
+          "category": "personal",
+          "what": "Çöp Sepeti’ne taşıdığınız dosyalar.",
+          "why": "Henüz silinmemiş dosyalardır; yer ancak Çöp Sepeti boşaltılınca açılır.",
+          "ifRemoved": "Çöp Sepeti boşaltılınca dosyalar kalıcı olarak silinir."
+        }
+      ]
+    },
+    {
+      "id": "installed-apps",
+      "name": "Yüklü uygulamalar",
+      "tone": "system",
+      "components": [
+        {
+          "id": "installed-apps-system",
+          "name": "Yüklü uygulama",
+          "children": "/Applications",
+          "safety": "incele",
+          "category": "system",
+          "what": "Mac’inize kurulu bir uygulama.",
+          "why": "Yüklü uygulamalar yer kaplar; kullanmadıklarınızı kaldırabilirsiniz.",
+          "ifRemoved": "Uygulama kaldırılır; App Store’dan veya yükleyiciden yeniden kurulabilir."
+        },
+        {
+          "id": "installed-apps-user",
+          "name": "Kullanıcı uygulaması",
+          "children": "~/Applications",
+          "safety": "incele",
+          "category": "system",
+          "what": "Yalnızca sizin hesabınıza kurulu bir uygulama.",
+          "why": "Yüklü uygulamalar yer kaplar; kullanmadıklarınızı kaldırabilirsiniz.",
+          "ifRemoved": "Uygulama kaldırılır; yeniden kurulabilir."
+        }
+      ]
+    },
+    {
+      "id": "app-data",
+      "name": "Uygulama verileri",
+      "tone": "system",
+      "components": [
+        {
+          "id": "slack",
+          "name": "Slack",
+          "paths": [
+            "~/Library/Application Support/Slack"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Slack’in yerel verileri ve önbelleği.",
+          "why": "Uygulamanın yerel çalışma verisidir.",
+          "ifRemoved": "Slack ilk açılışta verileri yeniden indirir; oturum açmanız gerekebilir."
+        },
+        {
+          "id": "discord",
+          "name": "Discord",
+          "paths": [
+            "~/Library/Application Support/discord"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Discord’un yerel verileri ve önbelleği.",
+          "why": "Uygulamanın yerel çalışma verisidir.",
+          "ifRemoved": "Discord ilk açılışta verileri yeniden indirir; oturum açmanız gerekebilir."
+        },
+        {
+          "id": "notion",
+          "name": "Notion",
+          "paths": [
+            "~/Library/Application Support/Notion"
+          ],
+          "safety": "incele",
+          "category": "dependencies",
+          "what": "Notion’ın yerel önbelleği ve çevrimdışı verileri.",
+          "why": "Notion’ın yerel çalışma verisidir.",
+          "ifRemoved": "Notion verileri yeniden eşitler; kaydedilmemiş yerel değişiklikler kaybolabilir."
+        },
+        {
+          "id": "steam",
+          "name": "Steam",
+          "paths": [
+            "~/Library/Application Support/Steam"
+          ],
+          "safety": "incele",
+          "category": "personal",
+          "what": "Steam’in yüklü oyunları ve yerel verileri.",
+          "why": "Oyunlarınızı ve kayıtlarını içerebilir.",
+          "ifRemoved": "Oyunlar silinir; yeniden indirilebilir ama bazı yerel kayıtlar kaybolabilir."
+        }
+      ]
+    }
+  ]
 }
