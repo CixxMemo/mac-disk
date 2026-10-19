@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="${1:-0.2.0}"
+VERSION="${1:-1.0.0}"
 APP="dist/DiskAtlas.app"
 
 swift build -c release --product DiskAtlasApp
@@ -21,7 +21,13 @@ plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
 codesign --force --deep --sign - "$APP"
 codesign --verify --strict --verbose=2 "$APP"
-(cd dist && ditto -c -k --norsrc --keepParent DiskAtlas.app DiskAtlas.zip)
+# Zip: DiskAtlas/ klasörü içinde .app + OKU-BENI.md (kılavuzdaki sürüm yer tutucusu doldurulur).
+PACK="$(mktemp -d)/DiskAtlas"
+mkdir -p "$PACK"
+ditto "$APP" "$PACK/DiskAtlas.app"
+sed "s/{{VERSION}}/$VERSION/g" docs/OKU-BENI.md > "$PACK/OKU-BENI.md"
+ZIP="dist/DiskAtlas-$VERSION.zip"
+ditto -c -k --norsrc --keepParent "$PACK" "$ZIP"
 
 echo "Hazır: $APP"
-echo "Zip:   dist/DiskAtlas.zip ($(du -h dist/DiskAtlas.zip | cut -f1))"
+echo "Zip:   $ZIP ($(du -h "$ZIP" | cut -f1))"
