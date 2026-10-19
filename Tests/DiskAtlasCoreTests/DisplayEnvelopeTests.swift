@@ -66,4 +66,41 @@ final class DisplayEnvelopeTests: XCTestCase {
         XCTAssertNil(object["ui"])
         XCTAssertNotNil(object["tree"])
     }
+
+    func testFindingsAreEmittedPerPathWithFullFolderBytes() throws {
+        var set = try RuleSet.bundled()
+        set.apps = [AppRule(id: "t", name: "Test", tone: "dev", components: [
+            component("multi", ["~/p1/m", "~/p2/m"], safety: .safe, category: .cache),
+            component("caches", ["~/Library/Caches"], safety: .safe, category: .cache),
+            component("spot", ["~/Library/Caches/spotify"], safety: .safe, category: .cache),
+        ])]
+        let index = ["/Users/me/p1/m": 2 * gb, "/Users/me/p2/m": 1 * gb, "/Users/me/Library/Caches": 15 * gb, "/Users/me/Library/Caches/spotify": 3 * gb]
+        let object = try json(DisplayEnvelope(report: try report(index), rules: set))
+        let findings = try XCTUnwrap((object["ui"] as? [String: Any])?["findings"] as? [[String: Any]])
+        let byPath = Dictionary(uniqueKeysWithValues: findings.map { ($0["path"] as! String, ($0["bytes"] as! NSNumber).int64Value) })
+        XCTAssertEqual(byPath["/Users/me/p1/m"], 2 * gb)
+        XCTAssertEqual(byPath["/Users/me/p2/m"], 1 * gb)
+        XCTAssertEqual(byPath["/Users/me/Library/Caches"], 15 * gb, "parent keeps its full folder size so selections can de-duplicate nesting")
+        XCTAssertEqual(byPath["/Users/me/Library/Caches/spotify"], 3 * gb)
+        let names = findings.compactMap { $0["name"] as? String }
+        XCTAssertTrue(names.contains { $0.contains("p1/m") }, "multi-path components are told apart by folder: \(names)")
+    }
+
+    func testScannerCandidatesAreMergedWhenNotCovered() throws {
+        var base = try report(["/Users/me/a": 3 * gb])
+        func candidate(_ path: String, _ bytes: Int64, _ category: DiskCategory) -> Candidate {
+            Candidate(name: (path as NSString).lastPathComponent, path: path, bytes: bytes, logical: bytes, category: category,
+                      label: "Önbellek", note: "aday notu")
+        }
+        base.candidates = [candidate("/Users/me/web/.next", 300 * mb, .build), candidate("/Users/me/a/inside", 400 * mb, .cache),
+                           candidate("/Users/me/small/.cache", 100 * mb, .cache), candidate("/Users/me/lib/models", 900 * mb, .models)]
+        let object = try json(DisplayEnvelope(report: base, rules: try rules()))
+        let findings = try XCTUnwrap((object["ui"] as? [String: Any])?["findings"] as? [[String: Any]])
+        let byPath = Dictionary(uniqueKeysWithValues: findings.map { ($0["path"] as! String, $0) })
+        XCTAssertEqual(byPath["/Users/me/web/.next"]?["group"] as? String, "cache")
+        XCTAssertEqual(byPath["/Users/me/lib/models"]?["group"] as? String, "review")
+        XCTAssertEqual(byPath["/Users/me/web/.next"]?["note"] as? String, "aday notu")
+        XCTAssertNil(byPath["/Users/me/a/inside"], "covered by a catalog finding")
+        XCTAssertNil(byPath["/Users/me/small/.cache"], "below the 150 MB threshold")
+    }
 }

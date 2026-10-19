@@ -77,4 +77,36 @@ final class AppRulesTests: XCTestCase {
         XCTAssertNil(set.apps)
         XCTAssertNoThrow(try set.validateCatalog())
     }
+
+    func testValidationRejectsTrailingSlashAndDuplicatePaths() throws {
+        func invalid(_ apps: [AppRule], _ note: String) throws {
+            XCTAssertThrowsError(try rules(apps).validateCatalog(), note) { XCTAssertTrue($0 is RuleCatalogError, note) }
+        }
+        try invalid([AppRule(id: "a", name: "A", tone: "dev", components: [component("c1", paths: ["~/x/"])])], "trailing slash")
+        try invalid([AppRule(id: "a", name: "A", tone: "dev", components: [component("c1", paths: ["~/x"]), component("c2", paths: ["~/X"])])],
+                    "same path in two components (case-insensitive)")
+        var withExclusion = component("c1", paths: nil, names: ["node_modules"])
+        withExclusion.excludeUnder = ["not-a-path"]
+        try invalid([AppRule(id: "a", name: "A", tone: "dev", components: [withExclusion])], "bad exclusion")
+        var onPaths = component("c1")
+        onPaths.excludeUnder = ["~/x"]
+        try invalid([AppRule(id: "a", name: "A", tone: "dev", components: [onPaths])], "excludeUnder only makes sense for names rules")
+    }
+
+    func testBundledSafeComponentsAreCacheSubfoldersNotToolRoots() throws {
+        let components = try XCTUnwrap(try RuleSet.bundled().apps).flatMap(\.components)
+        let byID = Dictionary(uniqueKeysWithValues: components.map { ($0.id, $0) })
+        let toolRoots: Set<String> = ["~/.nuget", "~/.pub-cache", "~/.cargo", "~/.gradle", "~/.m2", "~/Library/Caches/JetBrains"]
+        for component in components where component.safety == .safe {
+            for path in component.paths ?? [] {
+                XCTAssertFalse(toolRoots.contains(path), "\(component.id) marks the root of a tool as safe: \(path)")
+            }
+        }
+        XCTAssertNotEqual(byID["jetbrains-cache"]?.safety, .safe, "Local History lives there")
+        XCTAssertNotEqual(byID["maven-repo"]?.safety, .safe, "mvn install artifacts live there")
+        XCTAssertEqual(byID["minecraft-saves"]?.safety, .never)
+        XCTAssertEqual(byID["node-modules"]?.safety, .safe)
+        XCTAssertFalse((byID["node-modules"]?.excludeUnder ?? []).isEmpty, "global installs must be excluded")
+        XCTAssertTrue((byID["brew-packages"]?.ifRemoved ?? "").contains("Homebrew"), "brew itself disappears")
+    }
 }

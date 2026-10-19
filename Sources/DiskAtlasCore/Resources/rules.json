@@ -102,7 +102,7 @@
           "category": "dependencies",
           "what": "Android araçlarının ayar, anahtar ve önbellek dosyaları (sanal cihazlar hariç).",
           "why": "Android geliştirme araçlarına ait yerel veridir.",
-          "ifRemoved": "Ayarlar ve önbellek yeniden oluşur. Hata ayıklama anahtarları dışında, burada yayın imzalama anahtarı tutuyorsanız silmeden önce kontrol edin."
+          "ifRemoved": "Ayarlar ve önbellek yeniden oluşur. debug.keystore silinirse yeni bir anahtar üretilir ve parmak izi (SHA-1) değişir; Firebase veya Google Haritalar gibi anahtara bağlı servisleri yeniden yapılandırmanız gerekebilir."
         }
       ]
     },
@@ -227,7 +227,24 @@
           "category": "dependencies",
           "what": "Projelerinizin kullandığı JavaScript paketlerinin kurulu kopyaları.",
           "why": "package.json dosyasından yeniden kurulabilen bağımlılıklardır.",
-          "ifRemoved": "Projeyi çalıştırmak için yeniden npm install gerekir; kaynak kodunuza dokunulmaz."
+          "ifRemoved": "Projeyi çalıştırmak için yeniden npm install gerekir; kaynak kodunuza dokunulmaz. Genel (global) npm kurulumları, uygulama paketleri ve editör eklentileri içindekiler bu satıra dahil edilmez.",
+          "excludeUnder": [
+            "/usr/local",
+            "/opt",
+            "/Applications",
+            "~/.nvm",
+            "~/.volta",
+            "~/.fnm",
+            "~/.nodenv",
+            "~/.asdf",
+            "~/.n",
+            "~/.vscode",
+            "~/.cursor",
+            "~/.npm",
+            "~/.qoder",
+            "~/Library/Application Support",
+            "~/Library/Containers"
+          ]
         }
       ]
     },
@@ -258,7 +275,16 @@
           "category": "build",
           "what": "Python’un derlenmiş ara dosyalarını sakladığı klasörler.",
           "why": "Python kaynak koddan kendisi yeniden üretir.",
-          "ifRemoved": "Python dosyaları ilk çalıştırmada yeniden derlenir; başka bir şey olmaz."
+          "ifRemoved": "Python dosyaları ilk çalıştırmada yeniden derlenir; kaynak kodunuza dokunulmaz.",
+          "excludeUnder": [
+            "/usr/local",
+            "/opt",
+            "/Applications",
+            "~/Library/Application Support",
+            "~/Library/Containers",
+            "~/.vscode",
+            "~/.cursor"
+          ]
         },
         {
           "id": "python-venv",
@@ -271,7 +297,16 @@
           "category": "dependencies",
           "what": "Projelerin kendi Python paketlerini ve yorumlayıcısını içeren sanal ortamları.",
           "why": "Projeye bağlı bağımlılıklardır; gereksinim dosyasından yeniden kurulabilir.",
-          "ifRemoved": "Proje, sanal ortam yeniden kurulana kadar çalışmaz."
+          "ifRemoved": "Proje, sanal ortam yeniden kurulana kadar çalışmaz; gereksinim dosyanız (requirements.txt, pyproject.toml) varsa yeniden kurulabilir.",
+          "excludeUnder": [
+            "/usr/local",
+            "/opt",
+            "/Applications",
+            "~/Library/Application Support",
+            "~/Library/Containers",
+            "~/.vscode",
+            "~/.cursor"
+          ]
         },
         {
           "id": "conda",
@@ -313,11 +348,11 @@
           "paths": [
             "~/.m2/repository"
           ],
-          "safety": "güvenli",
+          "safety": "incele",
           "category": "cache",
-          "what": "Maven’ın indirdiği Java kütüphanelerinin yerel deposu.",
-          "why": "Yeniden indirilebilen bir önbellektir.",
-          "ifRemoved": "Sonraki derleme kütüphaneleri yeniden indirir."
+          "what": "Maven’ın indirdiği Java kütüphanelerinin ve yerelde kurduğunuz (mvn install) çıktıların deposu.",
+          "why": "Çoğu yeniden indirilebilir, ama yerelde kurduğunuz ve başka yerde yayınlanmamış çıktılar da burada olabilir.",
+          "ifRemoved": "İndirilebilen kütüphaneler yeniden indirilir; yalnızca yerelde kurduğunuz çıktılar kaybolur."
         },
         {
           "id": "gradle-other",
@@ -329,7 +364,7 @@
           "category": "dependencies",
           "what": "Gradle’ın indirdiği dağıtımlar (wrapper), ayarları ve diğer yerel verileri.",
           "why": "Gradle araç zincirine ait yerel veridir.",
-          "ifRemoved": "Gradle dağıtımları gerektiğinde yeniden indirilir; ayarlar sıfırlanabilir."
+          "ifRemoved": "Gradle dağıtımları gerektiğinde yeniden indirilir. gradle.properties içindeki ayarlar ve kimlik bilgileri silinir; önce kontrol edin."
         }
       ]
     },
@@ -342,13 +377,14 @@
           "id": "pub-cache",
           "name": "Dart/Flutter paket önbelleği",
           "paths": [
-            "~/.pub-cache"
+            "~/.pub-cache/hosted",
+            "~/.pub-cache/git"
           ],
           "safety": "güvenli",
           "category": "cache",
-          "what": "Dart ve Flutter paketlerinin indirilmiş kopyaları.",
+          "what": "Dart ve Flutter paketlerinin indirilmiş kopyaları (hosted ve git).",
           "why": "Yeniden indirilebilen bir önbellektir.",
-          "ifRemoved": "Sonraki flutter pub get paketleri yeniden indirir."
+          "ifRemoved": "Sonraki flutter pub get paketleri yeniden indirir. dart pub global activate ile kurduğunuz araçlar (bin, global_packages) bu klasörlerde değildir."
         }
       ]
     },
@@ -398,7 +434,7 @@
           "category": "dependencies",
           "what": "Homebrew ile kurulan komut satırı araçları ve kütüphaneler.",
           "why": "Kurduğunuz araçların kendisidir.",
-          "ifRemoved": "Kurulu araçlar çalışmaz; brew ile yeniden kurulmaları gerekir."
+          "ifRemoved": "Homebrew’un kendisi ve kurduğunuz bütün araçlar silinir; önce Homebrew’u, sonra araçları yeniden kurmanız gerekir."
         },
         {
           "id": "brew-cache",
@@ -484,15 +520,15 @@
       "components": [
         {
           "id": "jetbrains-cache",
-          "name": "JetBrains önbelleği",
+          "name": "JetBrains önbelleği ve yerel geçmiş",
           "paths": [
             "~/Library/Caches/JetBrains"
           ],
-          "safety": "güvenli",
+          "safety": "incele",
           "category": "cache",
-          "what": "IntelliJ, PyCharm, Android Studio gibi araçların dizin ve önbellek dosyaları.",
-          "why": "Yeniden üretilen bir önbellektir.",
-          "ifRemoved": "Projeler ilk açılışta yeniden dizinlenir; bu biraz zaman alır."
+          "what": "IDE dizin önbelleği ve Yerel Geçmiş (Local History) kayıtları.",
+          "why": "Büyük kısmı yeniden üretilen önbelleklerdir, ama Yerel Geçmiş de aynı klasörde tutulur.",
+          "ifRemoved": "Projeler yeniden dizinlenir. Yerel Geçmiş, commit edilmemiş eski sürümlerinizin tek kaydı olabilir; silinirse geri dönülemez."
         },
         {
           "id": "jetbrains-data",
@@ -523,7 +559,7 @@
           "category": "models",
           "what": "LM Studio’nun indirdiği dil modelleri ve çalışma bileşenleri.",
           "why": "İndirdiğiniz yapay zekâ modellerinin büyük dosyalarını içerir.",
-          "ifRemoved": "Modeller silinir; yeniden indirmek uzun sürebilir."
+          "ifRemoved": "İndirdiğiniz modeller ve sohbet geçmişiniz silinir; modelleri yeniden indirmek uzun sürebilir."
         },
         {
           "id": "ollama",
@@ -566,7 +602,7 @@
           "category": "dependencies",
           "what": "Gemini komut satırı aracının ayarları, oturum geçmişi ve önbellek verileri.",
           "why": "Aracın yerel çalışma verisidir.",
-          "ifRemoved": "Ayarlar ve oturum geçmişi sıfırlanır."
+          "ifRemoved": "Ayarlar, oturum geçmişi ve oturum açma bilgileri silinir; yeniden giriş yapmanız gerekir. Kendi yazdığınız GEMINI.md gibi dosyalar burada olabilir, kontrol edin."
         }
       ]
     },
@@ -973,9 +1009,21 @@
           ],
           "safety": "incele",
           "category": "personal",
-          "what": "Minecraft’ın oyun dosyaları, dünyaları (kayıtlar) ve başlatıcı verileri.",
+          "what": "Minecraft’ın oyun dosyaları ve başlatıcı verileri (dünyalar ayrıca listelenir).",
           "why": "Oyun ilerlemenizi içerebilir.",
           "ifRemoved": "Dünyalarınız ve kayıtlarınız kaybolabilir; oyun dosyaları yeniden indirilebilir."
+        },
+        {
+          "id": "minecraft-saves",
+          "name": "Minecraft dünyaları",
+          "paths": [
+            "~/Library/Application Support/minecraft/saves"
+          ],
+          "safety": "asla",
+          "category": "personal",
+          "what": "Oyun dünyalarınız (kayıtlar).",
+          "why": "Oyun ilerlemenizdir; yeniden üretilemez.",
+          "ifRemoved": "Dünyalarınız kalıcı olarak kaybolur."
         }
       ]
     },
@@ -988,14 +1036,15 @@
           "id": "nuget",
           "name": "NuGet önbelleği",
           "paths": [
-            "~/.nuget",
-            "~/.local/share/NuGet"
+            "~/.nuget/packages",
+            "~/.local/share/NuGet/http-cache",
+            "~/.local/share/NuGet/v3-cache"
           ],
           "safety": "güvenli",
           "category": "cache",
-          "what": "NuGet’in indirdiği .NET paketlerinin önbelleği.",
+          "what": "NuGet’in indirdiği .NET paketlerinin ve ağ yanıtlarının önbelleği.",
           "why": "Yeniden indirilebilen bir önbellektir.",
-          "ifRemoved": "Sonraki derleme paketleri yeniden indirir."
+          "ifRemoved": "Sonraki derleme paketleri yeniden indirir. NuGet ayar dosyalarınız (kaynaklar, kimlik bilgileri) bu klasörlerde değildir ve etkilenmez."
         }
       ]
     },
@@ -1028,7 +1077,7 @@
           "category": "dependencies",
           "what": "Codex aracının ayarları, oturumları ve indirdiği çalışma zamanı bağımlılıkları.",
           "why": "Aracın yerel çalışma verisidir.",
-          "ifRemoved": "Oturum geçmişi ve ayarlar sıfırlanır; bağımlılıklar gerektiğinde yeniden indirilir."
+          "ifRemoved": "Oturum geçmişi, ayarlar ve oturum açma bilgileri sıfırlanır; yeniden giriş yapmanız gerekir. Kendi yazdığınız AGENTS.md gibi dosyalar burada olabilir. Bağımlılıklar gerektiğinde yeniden indirilir."
         },
         {
           "id": "qoder",

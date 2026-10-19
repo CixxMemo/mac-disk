@@ -28,17 +28,33 @@ public struct DisplayEnvelope: Encodable {
         self.report = report
         let apps = AppCatalog.build(report: report, rules: rules)
         self.apps = apps
-        self.ui = apps.map { Self.makeUI($0) }
+        self.ui = apps.map { Self.makeUI($0, candidates: report.candidates) }
     }
 
-    private static func makeUI(_ apps: AppsReport) -> UI {
-        let findings = apps.apps.flatMap(\.components)
-            .filter { $0.safety != .never && $0.bytes >= minFindingBytes }
-            .sorted { $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.id < $1.id }
-            .prefix(maxFindings)
-            .map { Finding(name: $0.name, path: $0.paths.first ?? "", bytes: $0.bytes, category: $0.category.rawValue,
-                           group: $0.safety == .safe ? "cache" : "review", note: $0.what) }
-        return UI(homePath: apps.homePath, findings: Array(findings))
+    /// Bulgular klasör başınadır ve TAM klasör boyutunu taşır (iç içe seçimler arayüzde bir kez sayılır).
+    /// Tarayıcının `candidates` listesindeki, katalog bulgularının kapsamadığı klasörler de eklenir (`build_ui.py` ile aynı).
+    private static func makeUI(_ apps: AppsReport, candidates: [Candidate]) -> UI {
+        var findings: [Finding] = []
+        for component in apps.apps.flatMap(\.components) where component.safety != .never {
+            for (path, bytes) in zip(component.paths, component.pathBytes) where bytes >= minFindingBytes {
+                let name = component.paths.count > 1 ? "\(component.name) · \(tail(path))" : component.name
+                findings.append(Finding(name: name, path: path, bytes: bytes, category: component.category.rawValue,
+                                        group: component.safety == .safe ? "cache" : "review", note: component.what))
+            }
+        }
+        let covered = findings.map(\.path)
+        for candidate in candidates where candidate.bytes >= minFindingBytes {
+            if covered.contains(where: { candidate.path == $0 || candidate.path.hasPrefix($0 + "/") }) { continue }
+            findings.append(Finding(name: candidate.name, path: candidate.path, bytes: candidate.bytes, category: candidate.category.rawValue,
+                                    group: candidate.category == .cache || candidate.category == .build ? "cache" : "review",
+                                    note: candidate.note))
+        }
+        findings.sort { $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.path < $1.path }
+        return UI(homePath: apps.homePath, findings: Array(findings.prefix(maxFindings)))
+    }
+
+    private static func tail(_ path: String) -> String {
+        path.split(separator: "/").suffix(2).joined(separator: "/")
     }
 
     private enum Keys: String, CodingKey { case apps, ui }

@@ -21,6 +21,9 @@ function validate(report){
  if(!Array.isArray(report.errors)||report.errors.length>100||!report.errors.every(x=>x&&typeof x.path==='string'&&typeof x.reason==='string'))throw Error('Tarama hata listesi geçersiz.');
  let count=0;function walk(node,depth){if(depth>10||++count>100000||!item(node))throw Error('Klasör ağacı geçersiz veya çok büyük.');if(node.children!==undefined){if(!Array.isArray(node.children))throw Error('Alt klasör listesi geçersiz.');node.children.forEach(x=>walk(x,depth+1));}}
  walk(report.tree,0);
+ if(report.apps){const a=report.apps,str=x=>typeof x==='string';
+  const comp=c=>c&&str(c.name)&&num(c.bytes)&&Array.isArray(c.paths)&&c.paths.every(str)&&str(c.safety)&&str(c.what)&&str(c.why)&&str(c.ifRemoved);
+  if(!Array.isArray(a.apps)||a.apps.length>500||!a.apps.every(x=>x&&str(x.id)&&str(x.name)&&str(x.tone)&&num(x.bytes)&&Array.isArray(x.components)&&x.components.length<=2000&&x.components.every(comp))||!Array.isArray(a.unrecognized)||a.unrecognized.length>1000||!a.unrecognized.every(x=>x&&str(x.path)&&num(x.bytes)&&num(x.ownBytes)))throw Error('Uygulama bilgileri geçersiz.');}
  if(report.ui){if(typeof report.ui.homePath!=='string'||!Array.isArray(report.ui.findings)||report.ui.findings.length>1000||!report.ui.findings.every(x=>item(x)&&['cache','review'].includes(x.group)&&typeof x.note==='string'))throw Error('Arayüz inceleme verileri geçersiz.');}
  return report;
 }

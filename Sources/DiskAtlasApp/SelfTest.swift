@@ -34,7 +34,7 @@ final class SelfTest {
                 func write(_ relative: String, megabytes: Double) throws {
                     let url = URL(fileURLWithPath: root).appendingPathComponent(relative)
                     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-                    try Data(count: Int(megabytes * 1_048_576)).write(to: url)
+                    try? Data(count: Int(megabytes * 1_048_576)).write(to: url, options: .withoutOverwriting)
                 }
                 try write(".npm/_cacache/blob", megabytes: 2)
                 try write("Library/Android/sdk/platform", megabytes: 3)

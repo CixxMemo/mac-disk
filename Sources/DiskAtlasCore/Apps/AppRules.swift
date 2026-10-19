@@ -22,6 +22,8 @@ public struct ComponentRule: Codable, Sendable {
     public var what: String
     public var why: String
     public var ifRemoved: String
+    /// Yalnızca `names` kuralları için: bu yolların altındaki eşleşmeler sayılmaz (örn. global npm kurulumları).
+    public var excludeUnder: [String]?
 }
 
 public struct AppRule: Codable, Sendable {
@@ -47,7 +49,7 @@ extension RuleSet {
 
     /// Kataloğun kurallarını denetler; ilk hatada `RuleCatalogError.invalid` fırlatır.
     public func validateCatalog() throws {
-        var appIDs = Set<String>(), componentIDs = Set<String>()
+        var appIDs = Set<String>(), componentIDs = Set<String>(), seenPaths = Set<String>()
         for app in apps ?? [] {
             guard !app.id.isEmpty, appIDs.insert(app.id).inserted else { throw RuleCatalogError.invalid("tekrar eden araç kimliği: \(app.id)") }
             guard Self.catalogTones.contains(app.tone) else { throw RuleCatalogError.invalid("\(app.id): bilinmeyen renk grubu \(app.tone)") }
@@ -59,6 +61,15 @@ extension RuleSet {
                 guard matchers == 1 else { throw RuleCatalogError.invalid("\(id): tam olarak bir eşleştirici gerekli") }
                 for path in (component.paths ?? []) + (component.children.map { [$0] } ?? []) {
                     try Self.validatePath(path, in: id)
+                }
+                for path in component.paths ?? [] {
+                    guard seenPaths.insert(path.lowercased()).inserted else {
+                        throw RuleCatalogError.invalid("\(id): aynı yol iki bileşende (büyük/küçük harf duyarsız): \(path)")
+                    }
+                }
+                if let exclusions = component.excludeUnder {
+                    guard component.names != nil else { throw RuleCatalogError.invalid("\(id): excludeUnder yalnızca ad kuralları içindir") }
+                    for path in exclusions { try Self.validatePath(path, in: id) }
                 }
                 if let paths = component.paths, paths.isEmpty { throw RuleCatalogError.invalid("\(id): boş yol listesi") }
                 if let names = component.names {
@@ -77,5 +88,6 @@ extension RuleSet {
     private static func validatePath(_ path: String, in id: String) throws {
         guard path.hasPrefix("~/") || path.hasPrefix("/") else { throw RuleCatalogError.invalid("\(id): yol '~/' veya '/' ile başlamalı: \(path)") }
         guard !path.split(separator: "/").contains("..") else { throw RuleCatalogError.invalid("\(id): yolda '..' olamaz: \(path)") }
+        guard path == "/" || !path.hasSuffix("/") else { throw RuleCatalogError.invalid("\(id): yol '/' ile bitemez: \(path)") }
     }
 }

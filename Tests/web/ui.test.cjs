@@ -458,3 +458,12 @@ test('switching to a report without apps leaves the apps view', async () => {
   assert(!visible(env, 'view-apps') && visible(env, 'view-explorer'));
   assert(!visible(env, 'appsNav'));
 });
+
+test('a malformed apps section is rejected instead of crashing later', () => {
+  const env = boot();
+  for (const bad of [{}, { apps: 'x', unrecognized: [] }, { apps: [{ id: 'a', name: 'A', tone: 'dev', bytes: 1, components: [{ name: 'c' }] }], unrecognized: [] },
+                     { apps: [], unrecognized: [{ path: 1, bytes: 1, ownBytes: 1 }] }]) {
+    assert.throws(() => env.run(`validate(${JSON.stringify(makeReport({ apps: bad }))})`), /uygulama/i);
+  }
+  assert.doesNotThrow(() => env.run(`validate(${JSON.stringify(makeReport({ apps: makeApps() }))})`));
+});

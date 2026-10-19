@@ -21,8 +21,8 @@ final class AppCatalogTests: XCTestCase {
                       what: text, why: text, ifRemoved: text)
     }
 
-    private func app(_ id: String, _ components: ComponentRule...) -> AppRule {
-        AppRule(id: id, name: id.capitalized, tone: "dev", components: components)
+    private func app(_ id: String, tone: String = "dev", _ components: ComponentRule...) -> AppRule {
+        AppRule(id: id, name: id.capitalized, tone: tone, components: components)
     }
 
     private func rules(_ apps: [AppRule]) throws -> RuleSet {
@@ -161,5 +161,57 @@ final class AppCatalogTests: XCTestCase {
         XCTAssertEqual(byID["xcode-app"]?.bytes, 10 * gb)
         XCTAssertEqual(byID["installed-apps-system/Notion"]?.bytes, 300 * mb)
         XCTAssertLessThanOrEqual(result.recognizedBytes, 200 * gb)
+    }
+
+    // MARK: İnceleme düzeltmeleri
+
+    func testNamesRuleDoesNotCarveOutOfToolComponentsOrAppBundles() throws {
+        let index = ["/Users/me/.vscode/extensions": 3 * gb, "/Users/me/.vscode/extensions/x/node_modules": 1 * gb,
+                     "/Applications/Slack.app": 500 * mb, "/Applications/Slack.app/Contents/Resources/node_modules": 200 * mb,
+                     "/Applications/Tiny.app/Contents/node_modules": 60 * mb, "/Users/me/proj/node_modules": 2 * gb]
+        let set = try rules([app("vscode", path("vscode-extensions", ["~/.vscode/extensions"])),
+                             app("installed", tone: "system", children("installed-apps", "/Applications")),
+                             app("js", names("node-modules", ["node_modules"]))])
+        let result = try XCTUnwrap(AppCatalog.build(report: try report(index), rules: set))
+        XCTAssertEqual(entries(result)["node-modules"]?.bytes, 2 * gb, "only the project's node_modules counts")
+        XCTAssertEqual(entries(result)["node-modules"]?.paths, ["/Users/me/proj/node_modules"])
+        XCTAssertEqual(entries(result)["vscode-extensions"]?.bytes, 3 * gb)
+        XCTAssertEqual(entries(result)["installed-apps/Slack"]?.bytes, 500 * mb)
+        XCTAssertNil(entries(result)["installed-apps/Tiny"])
+    }
+
+    func testNamesRuleStillCarvesOutOfPersonalFolders() throws {
+        let index = ["/Users/me/Documents": 12 * gb, "/Users/me/Documents/p/node_modules": 2 * gb]
+        let set = try rules([app("personal", tone: "personal", path("documents", ["~/Documents"], safety: .never)),
+                             app("js", names("node-modules", ["node_modules"]))])
+        let result = try XCTUnwrap(AppCatalog.build(report: try report(index), rules: set))
+        XCTAssertEqual(entries(result)["documents"]?.bytes, 10 * gb)
+        XCTAssertEqual(entries(result)["node-modules"]?.bytes, 2 * gb)
+    }
+
+    func testNamesRuleExcludeUnderPrefixes() throws {
+        var rule = names("node-modules", ["node_modules"])
+        rule.excludeUnder = ["~/.nvm", "/opt"]
+        let index = ["/Users/me/.nvm/versions/node/v20/lib/node_modules": 1 * gb, "/opt/homebrew/lib/node_modules": 800 * mb,
+                     "/Users/me/p/node_modules": 1 * gb]
+        let result = try XCTUnwrap(AppCatalog.build(report: try report(index), rules: try rules([app("js", rule)])))
+        XCTAssertEqual(entries(result)["node-modules"]?.bytes, 1 * gb)
+        XCTAssertEqual(entries(result)["node-modules"]?.paths, ["/Users/me/p/node_modules"])
+    }
+
+    func testComponentEntriesCarryRawFolderBytesPerPath() throws {
+        let index = ["/Users/me/Library/Caches": 15 * gb, "/Users/me/Library/Caches/com.spotify.client": 3 * gb]
+        let set = try rules([app("general", path("caches-other", ["~/Library/Caches"])), app("spotify", path("spotify-cache", ["~/Library/Caches/com.spotify.client"]))])
+        let result = try XCTUnwrap(AppCatalog.build(report: try report(index), rules: set))
+        XCTAssertEqual(entries(result)["caches-other"]?.bytes, 12 * gb)
+        XCTAssertEqual(entries(result)["caches-other"]?.pathBytes, [15 * gb])
+        XCTAssertEqual(entries(result)["spotify-cache"]?.pathBytes, [3 * gb])
+    }
+
+    func testCaseVariantsWithEqualBytesResolveDeterministically() throws {
+        let index = ["/Users/me/Library/Caches/Foo": 2 * gb, "/Users/me/Library/Caches/foo": 2 * gb]
+        let set = try rules([app("x", path("foo", ["~/Library/Caches/foo"]))])
+        let results = try (0..<5).map { _ in try XCTUnwrap(AppCatalog.build(report: try report(index), rules: set)).apps[0].components[0].paths[0] }
+        XCTAssertEqual(Set(results).count, 1)
     }
 }

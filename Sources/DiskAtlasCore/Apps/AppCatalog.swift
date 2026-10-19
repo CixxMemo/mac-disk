@@ -6,6 +6,8 @@ public struct ComponentEntry: Codable, Equatable, Sendable {
     public var bytes: Int64
     /// Eşleşen gerçek klasörler (en büyükten, en fazla 5).
     public var paths: [String]
+    /// `paths` ile aynı sırada, her klasörün TAM boyutu (iç içe bileşenler düşülmemiş hali).
+    public var pathBytes: [Int64]
     public var safety: Safety
     public var category: DiskCategory
     public var what: String
@@ -57,7 +59,7 @@ public enum AppCatalog {
         var lowerIndex: [String: (path: String, bytes: Int64)] = [:]
         for (path, bytes) in index {
             let lower = path.lowercased()
-            if let existing = lowerIndex[lower], existing.bytes >= bytes { continue }
+            if let existing = lowerIndex[lower], existing.bytes > bytes || (existing.bytes == bytes && existing.path <= path) { continue }
             lowerIndex[lower] = (path, bytes)
         }
 
@@ -97,6 +99,25 @@ public enum AppCatalog {
             byLower[match.lower] = match
         }
 
+        // 2b) Ad kuralları (node_modules, __pycache__ ...) yalnızca kişisel klasörlerden veya sahipsiz alandan pay alır:
+        //     uygulama paketlerinin (.app), araç/eklenti klasörlerinin ve `excludeUnder` yollarının içindekiler
+        //     bulundukları yerde kalır, yeniden oluşturulabilir diye etiketlenmez.
+        for match in byLower.values where match.priority == 1 {
+            let rule = apps[match.appIndex].components[match.componentIndex]
+            var excluded = match.lower.contains(".app/")
+            if !excluded {
+                excluded = (rule.excludeUnder ?? []).contains { raw in
+                    guard let expanded = expand(raw, home: home)?.lowercased() else { return false }
+                    return match.lower == expanded || match.lower.hasPrefix(expanded + "/")
+                }
+            }
+            if !excluded, let ancestor = nearestAncestor(of: match.lower, in: byLower), let outer = byLower[ancestor],
+               apps[outer.appIndex].tone != "personal" {
+                excluded = true
+            }
+            if excluded { byLower[match.lower] = nil }
+        }
+
         // 3) Aynı bileşenin içindeki iç eşleşmeler (iç içe node_modules) ayrıca sayılmaz.
         var kept = byLower
         for match in byLower.values {
@@ -113,7 +134,7 @@ public enum AppCatalog {
         }
 
         // 5) Bileşen kayıtları
-        struct Piece { var path: String; var bytes: Int64 }
+        struct Piece { var path: String; var bytes: Int64; var raw: Int64 }
         var grouped: [Int: [Int: [Piece]]] = [:]
         var childEntries: [Int: [ComponentEntry]] = [:]
         for match in kept.values {
@@ -122,9 +143,9 @@ public enum AppCatalog {
             let rule = apps[match.appIndex].components[match.componentIndex]
             if let childName = match.childName {
                 childEntries[match.appIndex, default: []].append(entry(rule, id: "\(rule.id)/\(childName)", name: childName,
-                                                                         bytes: effective, paths: [match.path]))
+                                                                         bytes: effective, paths: [match.path], pathBytes: [match.bytes]))
             } else {
-                grouped[match.appIndex, default: [:]][match.componentIndex, default: []].append(Piece(path: match.path, bytes: effective))
+                grouped[match.appIndex, default: [:]][match.componentIndex, default: []].append(Piece(path: match.path, bytes: effective, raw: match.bytes))
             }
         }
         var appEntries: [AppEntry] = []
@@ -133,7 +154,8 @@ public enum AppCatalog {
             for (ci, pieces) in grouped[ai] ?? [:] {
                 let sorted = pieces.sorted { $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.path < $1.path }
                 components.append(entry(app.components[ci], id: app.components[ci].id, name: app.components[ci].name,
-                                        bytes: sorted.reduce(0) { $0 + $1.bytes }, paths: Array(sorted.prefix(5).map(\.path))))
+                                        bytes: sorted.reduce(0) { $0 + $1.bytes }, paths: Array(sorted.prefix(5).map(\.path)),
+                                        pathBytes: Array(sorted.prefix(5).map(\.raw))))
             }
             guard !components.isEmpty else { continue }
             components.sort { $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.id < $1.id }
@@ -163,8 +185,8 @@ public enum AppCatalog {
                           recognizedBytes: appEntries.reduce(0) { $0 + $1.bytes })
     }
 
-    private static func entry(_ rule: ComponentRule, id: String, name: String, bytes: Int64, paths: [String]) -> ComponentEntry {
-        ComponentEntry(id: id, name: name, bytes: bytes, paths: paths, safety: rule.safety, category: rule.category,
+    private static func entry(_ rule: ComponentRule, id: String, name: String, bytes: Int64, paths: [String], pathBytes: [Int64]) -> ComponentEntry {
+        ComponentEntry(id: id, name: name, bytes: bytes, paths: paths, pathBytes: pathBytes, safety: rule.safety, category: rule.category,
                        what: rule.what, why: rule.why, ifRemoved: rule.ifRemoved)
     }
 
