@@ -42,6 +42,22 @@ final class ScannerReportTests: XCTestCase {
         XCTAssertEqual(report.incomplete, false)
     }
 
+    func testDeepTreeScanSurvivesSmallThreadStack() throws {
+        let tree = try TempTree()
+        let leaf = try tree.file(Array(repeating: "d", count: 300).joined(separator: "/") + "/leaf.bin", size: 100)
+        var result: Result<Report, Error>?
+        let done = DispatchSemaphore(value: 0)
+        let thread = Thread {
+            result = Result { try DiskScanner(options: ScanOptions(root: tree.path()), classifier: try TestSupport.classifier()).run() }
+            done.signal()
+        }
+        thread.stackSize = 512 * 1024
+        thread.start()
+        done.wait()
+        let report = try XCTUnwrap(result).get()
+        XCTAssertEqual(report.tree.bytes, TestSupport.allocated(leaf))
+    }
+
     func testZeroByteChildrenAreNotListed() throws {
         let tree = try TempTree()
         try tree.dir("empty")

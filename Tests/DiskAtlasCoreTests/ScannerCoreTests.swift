@@ -71,6 +71,16 @@ final class ScannerCoreTests: XCTestCase {
         }
     }
 
+    func testUnreadableRootThrowsRootUnreadable() throws {
+        let tree = try TempTree()
+        try tree.file("a.bin", size: 100)
+        XCTAssertEqual(chmod(tree.path(), 0o000), 0)
+        defer { chmod(tree.path(), 0o755) }
+        XCTAssertThrowsError(try scan(tree)) { error in
+            XCTAssertEqual(error as? ScanFailure, .rootUnreadable(tree.path()))
+        }
+    }
+
     func testOddFilenamesDoNotCrash() throws {
         let tree = try TempTree()
         let names = ["cafe\u{301}.txt", "with space.txt", "new\nline.txt", "emoji-\u{1F600}.txt"]

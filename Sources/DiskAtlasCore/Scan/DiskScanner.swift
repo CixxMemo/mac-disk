@@ -76,6 +76,7 @@ public final class DiskScanner {
     private var started = 0.0
     private var lastProgress = 0.0
     private var stopped = false
+    private var rootFailed = false
     private var rootDevice: Int32 = 0
     private var stats = Stats(entries: 0, files: 0, folders: 0, errors: 0, symlinks: 0,
                               otherMounts: 0, cloudPlaceholders: 0, hardlinkRepeats: 0)
@@ -97,12 +98,35 @@ public final class DiskScanner {
         self.now = now
     }
 
+    /// Taramayı 64 MiB yığınlı ayrı bir iş parçacığında çalıştırır: özyineleme, çağıranın yığın boyutundan
+    /// bağımsız olarak en derin yola (PATH_MAX ≈ 511 düzey) yeter. `isCancelled` ve `progress` o iş
+    /// parçacığında çağrılır.
     public func run(isCancelled: @escaping () -> Bool = { false },
                     progress: ((ScanProgress) -> Void)? = nil) throws -> Report {
+        let outcome = Outcome()
+        let done = DispatchSemaphore(value: 0)
+        let thread = Thread { [self] in
+            outcome.result = Result { try execute(isCancelled: isCancelled, progress: progress) }
+            done.signal()
+        }
+        thread.stackSize = Self.scanStackSize
+        thread.start()
+        done.wait()
+        return try outcome.result!.get()
+    }
+
+    private final class Outcome: @unchecked Sendable {
+        var result: Result<Report, Error>?
+    }
+
+    private static let scanStackSize = 64 * 1024 * 1024
+
+    private func execute(isCancelled: @escaping () -> Bool, progress: ((ScanProgress) -> Void)?) throws -> Report {
         let root = URL(fileURLWithPath: options.root).standardizedFileURL.path
         guard let rootStat = try? fileSystem.lstat(root) else { throw ScanFailure.rootUnreadable(options.root) }
         reset(rootDevice: rootStat.device, isCancelled: isCancelled, progress: progress)
-        guard let tree = scan(path: root, depth: 0, inherited: nil, insideCandidate: false, stat: rootStat) else {
+        guard let tree = scan(path: root, depth: 0, inherited: nil, insideCandidate: false, stat: rootStat),
+              !rootFailed else {
             throw ScanFailure.rootUnreadable(options.root)
         }
         let elapsed = now() - started
@@ -130,6 +154,7 @@ public final class DiskScanner {
         started = now()
         lastProgress = started
         stopped = false
+        rootFailed = false
         stats = Stats(entries: 0, files: 0, folders: 0, errors: 0, symlinks: 0,
                       otherMounts: 0, cloudPlaceholders: 0, hardlinkRepeats: 0)
         errors = []
@@ -226,6 +251,7 @@ public final class DiskScanner {
         guard info.kind == .directory else { return nil }
         stats.folders += 1
         if info.isDataless {
+            if depth == 0 { rootFailed = true }
             recordError(path, "Bulut klasörü: içerik indirmemek için alt öğeler taranmadı.")
             return node
         }
@@ -254,8 +280,10 @@ public final class DiskScanner {
                 }
             }
         } catch let error as FileSystemError {
+            if depth == 0 { rootFailed = true }
             recordError(path, error.reason)
         } catch {
+            if depth == 0 { rootFailed = true }
             recordError(path, "OSError: \(error)")
         }
         if depth < Self.maxDepth { node.children = pruned(children, parent: node) }
