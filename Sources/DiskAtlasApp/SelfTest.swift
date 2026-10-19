@@ -95,6 +95,37 @@ final class SelfTest {
             }
             _ = try await evaluate("document.querySelector('[data-view=history]').classList.contains('hidden')")
 
+            // Temizlik: npm önbelleği (güvenli) Uygulamalar sekmesinden seçilir, plan onaylanır, öğe `trash-sim` klasörüne taşınır.
+            // Sınama gerçek Çöp Sepeti'ne dokunmaz (DirectoryTrasher); gerçek `trashItem` yalnızca elle denemeyle doğrulanır.
+            if let root = config.scanRoot, let store = config.storeDirectory {
+                _ = try await evaluate("document.getElementById('appsNav').click()")
+                results["badgeText"] = try await evaluate("document.getElementById('modeBadgeText').textContent")
+                _ = try await evaluate("(() => { const box = [...document.querySelectorAll('#appsList input')].find(b => b.getAttribute('aria-label').includes('.npm')); box.checked = true; box.onchange(); return true; })()")
+                guard try await waitFor("!document.getElementById('cleanupBar').classList.contains('hidden')") else {
+                    return finish(ok: false, reason: "temizlik çubuğu seçimden sonra görünmedi")
+                }
+                _ = try await evaluate("document.getElementById('cleanupBtn').click()")
+                guard try await waitFor("!document.getElementById('dialogBackdrop').classList.contains('hidden') && document.getElementById('dialogBody').textContent.includes('Toplam')") else {
+                    return finish(ok: false, reason: "taşıma planı penceresi açılmadı")
+                }
+                results["planText"] = try await evaluate("document.getElementById('dialogBody').textContent.slice(0, 300)")
+                if let path = config.snapshotPath { try await snapshot(to: Self.suffixed(path, "-cleanup")) }
+                _ = try await evaluate("(() => { const b = document.getElementById('dialogBody').querySelectorAll('button'); b[b.length - 1].click(); return true; })()")
+                guard try await waitFor("!document.getElementById('staleBar').classList.contains('hidden') && document.getElementById('dialogBody').textContent.includes('Taşındı')") else {
+                    return finish(ok: false, reason: "taşıma sonucu görünmedi")
+                }
+                results["resultText"] = try await evaluate("document.getElementById('dialogBody').textContent.slice(0, 300)")
+                if let path = config.snapshotPath { try await snapshot(to: Self.suffixed(path, "-cleanup-done")) }
+                _ = try await evaluate("document.getElementById('closeDialog').click()")
+                let moved = !FileManager.default.fileExists(atPath: URL(fileURLWithPath: root).appendingPathComponent(".npm").path)
+                    && FileManager.default.fileExists(atPath: URL(fileURLWithPath: store).appendingPathComponent("trash-sim/.npm/_cacache/blob").path)
+                let logged = (try? String(contentsOfFile: URL(fileURLWithPath: store).appendingPathComponent("actions.log").path, encoding: .utf8))?
+                    .contains("\"result\":\"trashed\"") == true
+                results["cleanupMoved"] = moved
+                results["cleanupLogged"] = logged
+                guard moved, logged else { return finish(ok: false, reason: "öğe taşınmadı veya günlüğe yazılmadı") }
+            }
+
             // İkinci tarama (kök altına ≥ 2 MiB'lık bir klasör eklenir), ardından Geçmiş'te karşılaştırma.
             if let root = config.scanRoot {
                 let folder = URL(fileURLWithPath: root).appendingPathComponent("selftest-grow")
