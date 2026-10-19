@@ -34,6 +34,7 @@ public final class BridgeRouter: @unchecked Sendable {
     private struct Failure: Error { var message: String }
 
     private let store: ReportStore
+    private let rules: RuleSet
     private let classifier: Classifier
     private let roots: ScanRoots
     private let appInfo: AppInfo
@@ -52,6 +53,7 @@ public final class BridgeRouter: @unchecked Sendable {
                 emit: @escaping @Sendable (Data) -> Void,
                 runner: @escaping ScanRunner = BridgeRouter.defaultRunner) {
         self.store = store
+        self.rules = rules
         self.classifier = Classifier(rules: rules)
         self.roots = roots
         self.appInfo = appInfo
@@ -153,7 +155,7 @@ public final class BridgeRouter: @unchecked Sendable {
     private func loadScan(id: String?) throws -> Data {
         guard let id else { throw Failure(message: "Geçersiz tarama kimliği.") }
         do {
-            return try JSONEncoder().encode(try store.load(id: id).forDisplay())
+            return try JSONEncoder().encode(DisplayEnvelope(report: try store.load(id: id), rules: rules))
         } catch ReportStoreError.invalidID {
             throw Failure(message: "Geçersiz tarama kimliği.")
         } catch ReportStoreError.notFound {
@@ -181,6 +183,8 @@ public final class BridgeRouter: @unchecked Sendable {
 
         let options = ScanOptions(root: root, excludedPaths: roots.excluded + [store.directoryPath], progressInterval: 1)
         let access = permission()
+        // Tarayıcı kökü `standardizedFileURL` ile normalleştirir; ana klasör de aynı biçimde saklanır.
+        let home = classifier.displayPath(URL(fileURLWithPath: roots.home).standardizedFileURL.path)
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             let finalEvent: [String: Any]
             do {
@@ -193,6 +197,7 @@ public final class BridgeRouter: @unchecked Sendable {
                           "folder": progress.currentPath, "elapsed": progress.elapsed])
                 })
                 report.fullDiskAccess = access.rawValue
+                report.homePath = home
                 finalEvent = ["event": "scanDone", "id": try store.save(report)]
             } catch let failure as ScanFailure {
                 finalEvent = ["event": "scanFailed", "message": failure.description]

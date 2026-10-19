@@ -29,6 +29,19 @@ final class SelfTest {
             if let path = config.snapshotPath { try await snapshot(to: Self.suffixed(path, "-welcome")) }
             results["welcomeVisible"] = try await evaluate("!document.getElementById('welcome').classList.contains('hidden')")
             results["permissionTitle"] = try await evaluate("document.getElementById('permissionTitle').textContent")
+            // Uygulamalar/Tanınmayan sınaması için kural kataloğuyla eşleşen (ve eşleşmeyen) klasörler.
+            if let root = config.scanRoot {
+                func write(_ relative: String, megabytes: Double) throws {
+                    let url = URL(fileURLWithPath: root).appendingPathComponent(relative)
+                    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try? Data(count: Int(megabytes * 1_048_576)).write(to: url, options: .withoutOverwriting)
+                }
+                try write(".npm/_cacache/blob", megabytes: 2)
+                try write("Library/Android/sdk/platform", megabytes: 3)
+                try write("Library/Caches/com.spotify.client/Data", megabytes: 2)
+                try write("Library/Caches/Other/cache.bin", megabytes: 2)
+                try write("Library/Application Support/Mystery/data.bin", megabytes: 110)
+            }
             _ = try await evaluate("document.getElementById('scanBtn').click()")
             let deadline = Date().addingTimeInterval(config.timeout - 5)
             while Date() < deadline {
@@ -56,6 +69,31 @@ final class SelfTest {
             results["appInfo"] = try await evaluate("document.getElementById('appInfoText').textContent")
             if let path = config.snapshotPath { try await snapshot(to: path) }
             guard results["dashboardVisible"] as? Bool == true else { return finish(ok: false, reason: "pano görünmedi") }
+
+            // Uygulamalar ve Tanınmayan görünümleri
+            guard try await waitFor("!document.getElementById('appsNav').classList.contains('hidden')") else {
+                return finish(ok: false, reason: "Uygulamalar sekmesi görünmedi")
+            }
+            _ = try await evaluate("document.getElementById('appsNav').click()")
+            guard try await waitFor("document.getElementById('appsList').children.length >= 2") else {
+                return finish(ok: false, reason: "Uygulamalar listesi boş")
+            }
+            _ = try await evaluate("document.querySelector('#appsList .app-head').click(); true")
+            let appRows = try await evaluate("[...document.getElementById('appsList').children].map(r => r.querySelector('.app-name').textContent)") as? [String] ?? []
+            results["appNames"] = appRows
+            results["firstAppDetail"] = try await evaluate("document.querySelector('#appsList .app-details').textContent.slice(0, 160)")
+            if let path = config.snapshotPath { try await snapshot(to: Self.suffixed(path, "-apps")) }
+            _ = try await evaluate("document.getElementById('unrecognizedNav').click()")
+            guard try await waitFor("document.getElementById('unrecognizedBody').children.length >= 1") else {
+                return finish(ok: false, reason: "Tanınmayan listesi boş")
+            }
+            let unknownRows = try await evaluate("[...document.getElementById('unrecognizedBody').children].map(r => r.textContent)") as? [String] ?? []
+            results["unrecognizedRows"] = unknownRows
+            if let path = config.snapshotPath { try await snapshot(to: Self.suffixed(path, "-unrecognized")) }
+            guard appRows.contains("Android"), appRows.contains("JavaScript araçları"), unknownRows.contains(where: { $0.contains("Mystery") }) else {
+                return finish(ok: false, reason: "beklenen araçlar veya tanınmayan klasör listede yok")
+            }
+            _ = try await evaluate("document.querySelector('[data-view=history]').classList.contains('hidden')")
 
             // İkinci tarama (kök altına ≥ 2 MiB'lık bir klasör eklenir), ardından Geçmiş'te karşılaştırma.
             if let root = config.scanRoot {

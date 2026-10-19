@@ -22,4 +22,34 @@
 .files-table.compare-table td:last-child{white-space:normal;line-height:1.5;padding-left:18px}
 .compare-note{padding:0 17px 14px}
 .dialog-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.apps-list{border-top:1px solid var(--line)}
+.app-row{border-bottom:1px solid var(--line)}
+.app-head{display:flex;align-items:center;gap:12px;width:100%;padding:14px 21px;text-align:left;font-size:12px}
+.app-head:hover{background:#fafbf9}
+.app-head .dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;border:1px solid #0002}
+.app-head .app-name{flex:1;min-width:0;font-weight:600}
+.app-head .app-size{font:11px var(--mono)}
+.app-head .app-bar{width:90px;height:5px;border-radius:3px;background:#eef0ec;overflow:hidden;flex-shrink:0}
+.app-head .app-bar i{display:block;height:100%;background:var(--green)}
+.app-head .chev{font-size:10px;color:var(--muted);width:12px}
+.app-details{padding:2px 21px 16px 43px}
+.app-component{padding:12px 0;border-top:1px dashed var(--line);font-size:11px;line-height:1.6}
+.app-component:first-child{border-top:0}
+.app-component .component-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.app-component .component-name{font-weight:600}
+.app-component .component-size{font:10px var(--mono);color:var(--muted)}
+.app-component .badge{display:inline-block;font-size:9px;border-radius:5px;padding:2px 6px;border:1px solid #e0e4dc;background:#f5f7f3;color:#6c7a66}
+.app-component .badge.safety-güvenli{background:#e9f4ec;border-color:#cfe3d4;color:#3a6951}
+.app-component .badge.safety-incele{background:#fff7e9;border-color:#eddfbf;color:#8f7b52}
+.app-component .badge.safety-asla{background:#f9ebe8;border-color:#ecd0c9;color:#8d4a3b}
+.app-component .component-path{font:9px var(--mono);color:var(--muted);word-break:break-all;display:flex;align-items:center;gap:8px;margin-top:3px}
+.app-component p{margin:5px 0 0;color:#4b5650}
+.app-component p strong{color:var(--ink)}
+.apps-note{padding:12px 21px 16px}
+.unrecognized-table th:nth-child(1){width:52%}
+.unrecognized-table td{padding:9px 12px;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.unrecognized-table td.num{font:10px var(--mono);text-align:right}
+.unrecognized-table td.actions{white-space:normal}
 
+.app-head .chev::before{content:'▸'}
+.app-head[aria-expanded="true"] .chev::before{content:'▾'}

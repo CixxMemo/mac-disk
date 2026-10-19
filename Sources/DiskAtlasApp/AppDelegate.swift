@@ -25,6 +25,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let root = config.scanRoot, let store = config.storeDirectory else {
                     throw SelfTest.Failure(message: "--self-test için --scan-root ve --store-dir gerekli.")
                 }
+                // Sınama kök altına örnek dosyalar yazar: gerçek ana klasörü kapsayan veya kök dizin olan bir yola izin verilmez.
+                let standardized = URL(fileURLWithPath: root).standardizedFileURL.path
+                let home = URL(fileURLWithPath: NSHomeDirectory()).standardizedFileURL.path
+                if standardized == "/" || home == standardized || home.hasPrefix(standardized + "/") {
+                    throw SelfTest.Failure(message: "--scan-root gerçek ana klasörünüzü içeremez; geçici bir klasör verin.")
+                }
                 dataRoot = root
                 homeRoot = root
                 storeDirectory = URL(fileURLWithPath: store)

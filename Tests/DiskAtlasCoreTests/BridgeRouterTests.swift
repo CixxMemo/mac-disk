@@ -279,4 +279,53 @@ final class BridgeRouterTests: XCTestCase {
         gate.signal()
         XCTAssertNotNil(log.wait(for: "scanDone"))
     }
+
+    // MARK: Uygulamalar: homePath ve loadScan yükü
+
+    func testStartScanRecordsHomePath() throws {
+        let report = try fixtureReport()
+        let router = try makeRouter(runner: { _, _, _, _ in report })
+        XCTAssertEqual(try send(router, "startScan", ["scope": "data"])["ok"] as? Bool, true)
+        let done = try XCTUnwrap(log.wait(for: "scanDone"))
+        XCTAssertEqual(try store.load(id: try XCTUnwrap(done["id"] as? String)).homePath, tree.path("home"))
+    }
+
+    func testLoadScanIncludesAppsAndUIFindings() throws {
+        var report = try fixtureReport()
+        report.schema = 2
+        report.homePath = "/Users/me"
+        report.folderIndex = ["/Users/me/Library/Android/sdk": 14_000_000_000, "/Users/me/.npm": 3_000_000_000]
+        let id = try store.save(report)
+        let data = try XCTUnwrap(try send(try makeRouter(), "loadScan", ["id": id])["data"] as? [String: Any])
+        let apps = try XCTUnwrap((data["apps"] as? [String: Any])?["apps"] as? [[String: Any]])
+        XCTAssertTrue(apps.contains { $0["name"] as? String == "Android" })
+        let ui = try XCTUnwrap(data["ui"] as? [String: Any])
+        XCTAssertEqual(ui["homePath"] as? String, "/Users/me")
+        let findings = try XCTUnwrap(ui["findings"] as? [[String: Any]])
+        XCTAssertTrue(findings.contains { ($0["path"] as? String)?.hasSuffix("/Android/sdk") == true })
+        XCTAssertNil(data["folderIndex"])
+    }
+
+    func testLoadScanOfScanWithoutFolderIndexOmitsAppsAndUI() throws {
+        let id = try store.save(try fixtureReport())      // şema 1, klasör dizini yok
+        let data = try XCTUnwrap(try send(try makeRouter(), "loadScan", ["id": id])["data"] as? [String: Any])
+        XCTAssertNil(data["apps"])
+        XCTAssertNil(data["ui"])
+        XCTAssertNotNil(data["tree"])
+    }
+
+    func testHomePathIsNormalizedLikeTheScannerRoot() throws {
+        // Foundation /private/var yerine /var yazar; ana klasör de aynı biçimde saklanmalı.
+        try tree.dir("home")   // /private öneki yalnızca yol varsa kaldırılır
+        let spelled = "/private" + tree.path("home")
+        let report = try fixtureReport()
+        let log = self.log!
+        let router = BridgeRouter(store: store, rules: try RuleSet.bundled(),
+                                  roots: ScanRoots(data: tree.path(), home: spelled, excluded: []),
+                                  appInfo: AppInfo(version: "1", macOS: "1"), permission: { .granted }, openFullDiskAccess: {},
+                                  emit: { log.append($0) }, runner: { _, _, _, _ in report })
+        XCTAssertEqual(try send(router, "startScan", ["scope": "data"])["ok"] as? Bool, true)
+        let done = try XCTUnwrap(log.wait(for: "scanDone"))
+        XCTAssertEqual(try store.load(id: try XCTUnwrap(done["id"] as? String)).homePath, tree.path("home"))
+    }
 }

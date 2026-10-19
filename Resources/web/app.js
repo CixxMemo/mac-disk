@@ -21,6 +21,9 @@ function validate(report){
  if(!Array.isArray(report.errors)||report.errors.length>100||!report.errors.every(x=>x&&typeof x.path==='string'&&typeof x.reason==='string'))throw Error('Tarama hata listesi geçersiz.');
  let count=0;function walk(node,depth){if(depth>10||++count>100000||!item(node))throw Error('Klasör ağacı geçersiz veya çok büyük.');if(node.children!==undefined){if(!Array.isArray(node.children))throw Error('Alt klasör listesi geçersiz.');node.children.forEach(x=>walk(x,depth+1));}}
  walk(report.tree,0);
+ if(report.apps){const a=report.apps,str=x=>typeof x==='string';
+  const comp=c=>c&&str(c.name)&&num(c.bytes)&&Array.isArray(c.paths)&&c.paths.every(str)&&str(c.safety)&&str(c.what)&&str(c.why)&&str(c.ifRemoved);
+  if(!Array.isArray(a.apps)||a.apps.length>500||!a.apps.every(x=>x&&str(x.id)&&str(x.name)&&str(x.tone)&&num(x.bytes)&&Array.isArray(x.components)&&x.components.length<=2000&&x.components.every(comp))||!Array.isArray(a.unrecognized)||a.unrecognized.length>1000||!a.unrecognized.every(x=>x&&str(x.path)&&num(x.bytes)&&num(x.ownBytes)))throw Error('Uygulama bilgileri geçersiz.');}
  if(report.ui){if(typeof report.ui.homePath!=='string'||!Array.isArray(report.ui.findings)||report.ui.findings.length>1000||!report.ui.findings.every(x=>item(x)&&['cache','review'].includes(x.group)&&typeof x.note==='string'))throw Error('Arayüz inceleme verileri geçersiz.');}
  return report;
 }
@@ -43,9 +46,9 @@ function load(report){
  $('filesText').textContent=report.stats.files.toLocaleString('tr-TR')+' dosya · erişilebilen kapsam';{const unmeasured=report.disk.used-report.tree.bytes;$('unmeasuredText').textContent=report.disk.used>0&&unmeasured>0?'≈ '+format(unmeasured)+' ölçülmedi: macOS sistem birimi, anlık görüntüler, korumalı alanlar':'';}$('homeText').textContent=shortPath(home.path)+' · erişilebilen dosyalar';
  $('legend').replaceChildren(...Object.values(tones).map(t=>{const span=element('span');const dot=element('i');dot.style.background=t.color;span.append(dot,document.createTextNode(t.name));return span;}));
  if(report.demo||report.incomplete||report.fullDiskAccess==='denied'){$('message').textContent=[report.demo?'Örnek veriler Mac’ine ait değildir.':'',report.incomplete?'Kısmi tarama: süre veya kayıt sınırı aşıldı ya da tarama iptal edildi.':'',report.fullDiskAccess==='denied'?'Tam Disk Erişimi olmadan yapıldı; korumalı klasörler ölçülmedi.':''].filter(Boolean).join(' ');$('message').classList.remove('hidden');}
- renderFindings();renderFiles();renderHealth();showView('explorer');
+ showAppsTabs(!!report.apps);expandedApps=new Set();$('appsSearch').value='';$('unrecognizedSearch').value='';renderFindings();renderFiles();renderHealth();showView('explorer');
 }
-function showView(view){if(!['explorer','files','health','history'].includes(view))return;if(!data){showToast('Önce bir disk raporu aç.');return;}activeView=view;document.querySelectorAll('.view').forEach(node=>node.classList.toggle('hidden',node.id!=='view-'+view));document.querySelectorAll('.nav-btn').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});if(view==='explorer')requestAnimationFrame(renderMap);if(view==='history')renderHistory();}
+function showView(view){if(!['explorer','files','health','history','apps','unrecognized'].includes(view))return;if(!data){showToast('Önce bir disk raporu aç.');return;}if((view==='apps'||view==='unrecognized')&&!data.apps){showToast('Bu rapor uygulama bilgisi içermiyor.');return;}activeView=view;document.querySelectorAll('.view').forEach(node=>node.classList.toggle('hidden',node.id!=='view-'+view));document.querySelectorAll('.nav-btn').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});if(view==='explorer')requestAnimationFrame(renderMap);if(view==='history')renderHistory();if(view==='apps')renderApps();if(view==='unrecognized')renderUnrecognized();}
 // Squarified treemap: build rows with nearly square rectangles rather than long strips.
 function squarify(items,x,y,width,height){
  const input=items.filter(item=>item.bytes>0).slice().sort((a,b)=>b.bytes-a.bytes);if(!input.length||width<=0||height<=0)return [];
@@ -304,4 +307,80 @@ $('compareBtn').onclick = runCompare;
 $('directOnlyBtn').onclick = () => { directOnly = !directOnly; $('directOnlyBtn').setAttribute('aria-pressed', String(directOnly)); if (compareResult) drawCompare(); };
 $('compareSearch').oninput = () => compareResult && drawCompare();
 filterNames.forEach(name => $('filter-' + name).onclick = () => { compareFilterName = name; setFilterButtons(); if (compareResult) drawCompare(); });
+// ---- Uygulamalar ve Tanınmayan ----
+const safetyLabels = { 'güvenli': 'Yeniden oluşturulabilir', 'incele': 'İncele', 'asla': 'Dokunma' };
+let expandedApps = new Set();
+const showAppsTabs = on => { $('appsNav').classList.toggle('hidden', !on); $('unrecognizedNav').classList.toggle('hidden', !on); };
+const lowered = text => String(text).toLocaleLowerCase('tr-TR');
+function mapButton(path) {
+  if (!index.has(path)) return null;
+  const button = element('button', 'text-button', 'Haritada göster');
+  button.onclick = () => goTo(index.get(path));
+  return button;
+}
+function componentBlock(component) {
+  const block = element('div', 'app-component'), top = element('div', 'component-top');
+  const badge = element('span', 'badge safety-' + component.safety, safetyLabels[component.safety] || component.safety);
+  top.append(element('span', 'component-name', component.name), element('span', 'component-size', format(component.bytes)), badge);
+  block.append(top);
+  for (const path of component.paths) {
+    const line = element('div', 'component-path', shortPath(path)); line.setAttribute('title', path);
+    const show = mapButton(path); if (show) line.append(show);
+    block.append(line);
+  }
+  const note = (label, text) => { const p = element('p'); p.append(element('strong', '', label + ': '), document.createTextNode(text)); return p; };
+  block.append(note('Nedir', component.what), note('Neden bu türde', component.why), note('Silinirse ne olur', component.ifRemoved));
+  return block;
+}
+function renderApps() {
+  const list = $('appsList'); list.replaceChildren();
+  if (!data || !data.apps) return;
+  const query = lowered($('appsSearch').value.trim());
+  const apps = data.apps.apps.map(app => !query || lowered(app.name).includes(query) ? app
+    : { ...app, components: app.components.filter(c => lowered(c.name).includes(query) || c.paths.some(p => lowered(p).includes(query))) })
+    .filter(app => app.components.length);
+  $('appsCount').textContent = apps.length + ' araç';
+  if (!data.apps.apps.length) { list.append(element('div', 'history-empty', 'Bu taramada tanınan araç yok. Büyük klasörler Tanınmayan sekmesinde listelenir.')); return; }
+  if (!apps.length) { list.append(element('div', 'history-empty', 'Eşleşen araç yok. Başka bir ad dene.')); return; }
+  const total = data.tree.bytes || 1;
+  for (const app of apps) {
+    const row = element('div', 'app-row'), head = element('button', 'app-head');
+    const open = Boolean(query) || expandedApps.has(app.id);
+    head.setAttribute('aria-expanded', String(open));
+    const dot = element('i', 'dot'); dot.style.background = (tones[app.tone] || tones.system).color;
+    const bar = element('span', 'app-bar'), fill = element('i'); fill.style.width = Math.min(100, app.bytes / total * 100) + '%'; bar.append(fill);
+    head.append(dot, element('span', 'app-name', app.name), element('span', 'app-size', format(app.bytes)), bar, element('span', 'chev', ''));
+    const details = element('div', 'app-details' + (open ? '' : ' hidden'));
+    details.append(...app.components.map(componentBlock));
+    let isOpen = open;   // DOM'dan okunmaz (sahte ve gerçek DOM aynı davranır)
+    head.onclick = () => {
+      isOpen = !isOpen;
+      head.setAttribute('aria-expanded', String(isOpen)); details.classList.toggle('hidden', !isOpen);
+      if (isOpen) expandedApps.add(app.id); else expandedApps.delete(app.id);
+    };
+    row.append(head, details); list.append(row);
+  }
+}
+function renderUnrecognized() {
+  const body = $('unrecognizedBody'); body.replaceChildren();
+  if (!data || !data.apps) return;
+  const query = lowered($('unrecognizedSearch').value.trim());
+  const folders = data.apps.unrecognized.filter(item => !query || lowered(item.path).includes(query));
+  $('unrecognizedCount').textContent = folders.length + ' klasör';
+  if (!folders.length) {
+    const row = element('tr'), cell = element('td', 'empty', data.apps.unrecognized.length ? 'Bu aramayla eşleşen klasör yok.' : 'Tanınmayan büyük klasör yok. Büyük klasörlerin hepsi bir araca bağlandı.');
+    cell.colSpan = 4; row.append(cell); body.append(row); return;
+  }
+  for (const item of folders) {
+    const row = element('tr'), path = element('td', '', shortPath(item.path)); path.setAttribute('title', item.path);
+    const actions = element('td', 'actions'), copy = element('button', 'text-button', 'Yolu kopyala');
+    copy.onclick = () => copyText(item.path);
+    actions.append(copy); const show = mapButton(item.path); if (show) actions.append(show);
+    row.append(path, element('td', 'num', format(item.bytes)), element('td', 'num', format(item.ownBytes)), actions);
+    body.append(row);
+  }
+}
+$('appsSearch').oninput = renderApps;
+$('unrecognizedSearch').oninput = renderUnrecognized;
+
 window.diskAtlasReady = bridge ? bootNative() : Promise.resolve($('welcome').classList.remove('hidden'));

@@ -13,6 +13,8 @@ public struct RuleSet: Codable, Sendable {
     public var stickyCategories: [DiskCategory]
     public var rules: [Rule]
     public var fallback: DiskCategory
+    /// Uygulama/araç kataloğu (Uygulamalar ve Tanınmayan görünümleri); eski dosyalarda yoktur.
+    public var apps: [AppRule]?
 
     public static func bundled() throws -> RuleSet {
         guard let url = Bundle.module.url(forResource: "rules", withExtension: "json") else {
