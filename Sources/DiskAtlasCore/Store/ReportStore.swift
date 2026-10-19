@@ -24,6 +24,8 @@ public final class ReportStore: @unchecked Sendable {
         self.directory = directory
     }
 
+    public var directoryPath: String { directory.path }
+
     public static func defaultDirectory() -> URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("DiskAtlas/scans", isDirectory: true)
