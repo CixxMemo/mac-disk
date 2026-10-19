@@ -2,6 +2,8 @@ import Foundation
 
 /// Çöp Sepeti'ne taşıma için sözcüksel (dosya sistemine bakmayan) kurallar. `check`, izin varsa `nil`, yoksa Türkçe neden döner.
 public struct TrashPolicy: Sendable {
+    public let homePath: String
+    public let applicationsPath: String?
     private let home: String
     private let applications: String?
     private let protectedPaths: [String]
@@ -15,6 +17,8 @@ public struct TrashPolicy: Sendable {
                                             "library/messages", "library/mail", "library/safari"]
 
     public init(home: String, applications: String?, protectedPaths: [String]) {
+        self.homePath = Self.trimmed(home)
+        self.applicationsPath = applications.map(Self.trimmed)
         self.home = Self.trimmed(home).lowercased()
         self.applications = applications.map { Self.trimmed($0).lowercased() }
         self.protectedPaths = protectedPaths.map { Self.trimmed($0).lowercased() }
