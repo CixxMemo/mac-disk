@@ -92,8 +92,9 @@ final class TrashServiceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: home.path(".npm")))
         XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(outcome.results[0].trashedTo)))
         let lines = try String(contentsOf: logURL, encoding: .utf8).split(separator: "\n")
-        XCTAssertEqual(lines.count, 1)
-        let entry = try JSONDecoder().decode(ActionLogEntry.self, from: Data(lines[0].utf8))
+        XCTAssertEqual(lines.count, 2, "önce niyet, sonra sonuç")
+        XCTAssertEqual(try JSONDecoder().decode(ActionLogEntry.self, from: Data(lines[0].utf8)).result, "moving")
+        let entry = try JSONDecoder().decode(ActionLogEntry.self, from: Data(lines[1].utf8))
         XCTAssertEqual(entry.result, "trashed")
         XCTAssertEqual(entry.path, home.path(".npm"))
         XCTAssertEqual(entry.scan, "scan-1")
@@ -142,8 +143,8 @@ final class TrashServiceTests: XCTestCase {
         XCTAssertEqual(outcome.results.map(\.ok), [false])
         XCTAssertEqual(outcome.movedBytes, 0)
         XCTAssertTrue(FileManager.default.fileExists(atPath: home.path(".npm")))
-        let entry = try JSONDecoder().decode(ActionLogEntry.self, from: Data(try String(contentsOf: logURL, encoding: .utf8).utf8))
-        XCTAssertEqual(entry.result, "failed")
+        let last = try XCTUnwrap(try String(contentsOf: logURL, encoding: .utf8).split(separator: "\n").last)
+        XCTAssertEqual(try JSONDecoder().decode(ActionLogEntry.self, from: Data(last.utf8)).result, "failed")
     }
 
     func testExecuteDoesNothingWhenLogUnavailable() throws {
@@ -182,5 +183,33 @@ final class TrashServiceTests: XCTestCase {
         XCTAssertNotEqual(first, second)
         XCTAssertTrue(FileManager.default.fileExists(atPath: first + "/f"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: second + "/g"))
+    }
+
+    private struct LogCheckingTrasher: Trasher {
+        let logPath: String
+        let seen: Box
+        func trash(_ path: String) throws -> String? {
+            seen.text = (try? String(contentsOfFile: logPath, encoding: .utf8)) ?? ""
+            return nil
+        }
+    }
+    private final class Box: @unchecked Sendable { var text = "" }
+
+    func testIntentIsLoggedBeforeTheMove() throws {
+        try home.file(".npm/a", size: 10)
+        let box = Box()
+        let service = service(trasher: LogCheckingTrasher(logPath: logURL.path, seen: box))
+        _ = try service.execute(plan(service, [".npm"], allowed: [candidate(".npm")]), acknowledgeReview: false)
+        XCTAssertTrue(box.text.contains("\"moving\""), "taşımadan önce günlükte niyet satırı olmalı: \(box.text)")
+    }
+
+    func testPlanUsesTheCatalogPathNotTheRequestedSpelling() throws {
+        let composed = "Caf\u{E9}"
+        try home.file("\(composed)/a", size: 10)
+        let decomposed = home.path("Cafe\u{301}")
+        let service = service()
+        let plan = service.plan(scanId: "scan-1", requested: [decomposed], allowed: [candidate(composed)])
+        XCTAssertEqual(plan.items.first?.status, .accepted)
+        XCTAssertEqual(Array(plan.items[0].path.unicodeScalars), Array(home.path(composed).unicodeScalars))
     }
 }

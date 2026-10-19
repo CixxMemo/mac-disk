@@ -21,20 +21,37 @@ public struct DisplayEnvelope: Encodable {
     private static let minFindingBytes: Int64 = 150_000_000
     private static let maxFindings = 100
 
+    /// Temizlik bilgisi: politikanın her zaman reddedeceği yollar (arayüz bunlara seçim kutusu göstermez) ve taramanın,
+    /// içinden öğe taşındığı için güncel olmadığı bilgisi.
+    public struct Cleanup: Encodable, Equatable {
+        public var blocked: [String: String]
+        public var stale: Bool
+    }
+
     public let report: Report
     public let apps: AppsReport?
     public let ui: UI?
+    public let cleanup: Cleanup?
 
-    public init(report: Report, rules: RuleSet) {
+    public init(report: Report, rules: RuleSet, policy: TrashPolicy? = nil, stale: Bool = false) {
         self.report = report
         let apps = AppCatalog.build(report: report, rules: rules)
         self.apps = apps
-        self.ui = apps.map { Self.makeUI($0, candidates: report.candidates) }
+        self.ui = apps.map { Self.makeUI($0, candidates: report.candidates, rules: rules) }
+        if let policy {
+            var blocked: [String: String] = [:]
+            for candidate in CleanupCatalog.candidates(report: report, rules: rules) {
+                if let reason = policy.check(candidate.path) { blocked[candidate.path] = reason }
+            }
+            self.cleanup = Cleanup(blocked: blocked, stale: stale)
+        } else {
+            self.cleanup = nil
+        }
     }
 
     /// Bulgular klasör başınadır ve TAM klasör boyutunu taşır (iç içe seçimler arayüzde bir kez sayılır).
     /// Tarayıcının `candidates` listesindeki, katalog bulgularının kapsamadığı klasörler de eklenir (`build_ui.py` ile aynı).
-    private static func makeUI(_ apps: AppsReport, candidates: [Candidate]) -> UI {
+    private static func makeUI(_ apps: AppsReport, candidates: [Candidate], rules: RuleSet) -> UI {
         var findings: [Finding] = []
         for component in apps.apps.flatMap(\.components) where component.safety != .never {
             for (path, bytes) in zip(component.paths, component.pathBytes) where bytes >= minFindingBytes {
@@ -46,6 +63,7 @@ public struct DisplayEnvelope: Encodable {
         }
         let covered = findings.map(\.path)
         for candidate in candidates where candidate.bytes >= minFindingBytes {
+            if CleanupCatalog.isExcludedCandidate(candidate.path, rules: rules, home: apps.homePath) { continue }
             if covered.contains(where: { candidate.path == $0 || candidate.path.hasPrefix($0 + "/") }) { continue }
             findings.append(Finding(name: candidate.name, path: candidate.path, bytes: candidate.bytes, category: candidate.category.rawValue,
                                     group: candidate.category == .cache || candidate.category == .build ? "cache" : "review",
@@ -59,12 +77,13 @@ public struct DisplayEnvelope: Encodable {
         path.split(separator: "/").suffix(2).joined(separator: "/")
     }
 
-    private enum Keys: String, CodingKey { case apps, ui }
+    private enum Keys: String, CodingKey { case apps, ui, cleanup }
 
     public func encode(to encoder: Encoder) throws {
         try report.forDisplay().encode(to: encoder)
         var container = encoder.container(keyedBy: Keys.self)
         try container.encodeIfPresent(apps, forKey: .apps)
         try container.encodeIfPresent(ui, forKey: .ui)
+        try container.encodeIfPresent(cleanup, forKey: .cleanup)
     }
 }

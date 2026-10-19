@@ -165,4 +165,54 @@ final class BridgeCleanupTests: XCTestCase {
         XCTAssertEqual(try send(router, "startScan", ["scope": "data"])["ok"] as? Bool, true)
         for _ in 0..<500 where router.isScanning { Thread.sleep(forTimeInterval: 0.01) }
     }
+
+    func testPolicyAloneRejectsDangerousCatalogAcceptedPaths() throws {
+        // Tarayıcı adayları izin kümesine girer; yine de ana klasör, kapsayıcı ve kişisel klasörler politika tarafından reddedilmeli.
+        try tree.file("home/Library/Caches/x", size: 10)
+        try tree.file("home/Documents/x/node_modules/m", size: 10)
+        let url = try XCTUnwrap(Bundle.module.url(forResource: "legacy-schema1", withExtension: "json", subdirectory: "Fixtures"))
+        var report = try ReportCodec.decode(try Data(contentsOf: url))
+        report.schema = 2
+        report.homePath = home
+        report.folderIndex = [home + "/other": gb]
+        func candidate(_ path: String) -> Candidate { Candidate(name: "x", path: path, bytes: gb, logical: gb, category: .cache, label: "l", note: "n") }
+        report.candidates = [candidate(home), candidate(home + "/Library/Caches"), candidate(home + "/Documents/x/node_modules")]
+        let id = try store.save(report)
+        let router = try router()
+        let paths = [home, home + "/Library/Caches", home + "/Documents/x/node_modules"]
+        let plan = try data(send(router, "planTrash", ["scanId": id, "paths": paths]))
+        let items = try XCTUnwrap(plan["items"] as? [[String: Any]])
+        XCTAssertEqual(items.map { $0["status"] as? String }, ["rejected", "rejected", "rejected"])
+        let reasons = items.compactMap { $0["reason"] as? String }
+        XCTAssertTrue(reasons[0].contains("Ana klasörün"), reasons[0])
+        XCTAssertTrue(reasons[1].contains("kendisi taşınamaz"), reasons[1])
+        XCTAssertTrue(reasons[2].contains("Kişisel"), reasons[2])
+    }
+
+    func testConfirmIsBlockedWhileScanning() throws {
+        let id = try savedScan()
+        let gate = DispatchSemaphore(value: 0)
+        let report = try store.load(id: id)
+        let router = try router(runner: { _, _, _, _ in gate.wait(); return report })
+        let plan = try data(send(router, "planTrash", ["scanId": id, "paths": [home + "/.npm"]]))
+        XCTAssertEqual(try send(router, "startScan", ["scope": "data"])["ok"] as? Bool, true)
+        assertError(try send(router, "confirmTrash", ["planId": try XCTUnwrap(plan["planId"] as? String), "acknowledgeReview": false]), contains: "Tarama sürerken")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: home + "/.npm"))
+        gate.signal()
+        for _ in 0..<500 where router.isScanning { Thread.sleep(forTimeInterval: 0.01) }
+    }
+
+    func testLoadScanReportsBlockedPathsAndStaleAfterMove() throws {
+        let id = try savedScan(index: [home + "/.npm": 3 * gb, home + "/Library/Caches": 2 * gb])
+        let router = try router()
+        var loaded = try data(send(router, "loadScan", ["id": id]))
+        var cleanup = try XCTUnwrap(loaded["cleanup"] as? [String: Any])
+        XCTAssertEqual(Set((cleanup["blocked"] as? [String: String] ?? [:]).keys), [home + "/Library/Caches"])
+        XCTAssertEqual(cleanup["stale"] as? Bool, false)
+        let plan = try data(send(router, "planTrash", ["scanId": id, "paths": [home + "/.npm"]]))
+        _ = try data(send(router, "confirmTrash", ["planId": try XCTUnwrap(plan["planId"] as? String), "acknowledgeReview": false]))
+        loaded = try data(send(router, "loadScan", ["id": id]))
+        cleanup = try XCTUnwrap(loaded["cleanup"] as? [String: Any])
+        XCTAssertEqual(cleanup["stale"] as? Bool, true, "taşımadan sonra aynı tarama tekrar açılsa da güncel değil sayılır")
+    }
 }

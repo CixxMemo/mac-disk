@@ -72,4 +72,18 @@ final class CleanupCatalogTests: XCTestCase {
     func testLegacyReportHasNoCandidates() throws {
         XCTAssertEqual(CleanupCatalog.candidates(report: try report(nil), rules: try rules()), [])
     }
+
+    func testScannerCandidatesRespectExcludeUnder() throws {
+        var set = try RuleSet.bundled()
+        set.apps = [AppRule(id: "js", name: "JS", tone: "dev", components: [
+            ComponentRule(id: "nm", name: "node_modules", paths: nil, names: ["node_modules"], children: nil, safety: .safe, category: .dependencies,
+                          what: "x nedir", why: text, ifRemoved: text, excludeUnder: ["~/.nvm"])])]
+        let candidates = [candidate("/Users/me/.nvm/versions/node/v20/lib/node_modules", bytes: 20_000_000),
+                          candidate("/Users/me/.nvm", bytes: 30_000_000), candidate("/Users/me/proj/x", bytes: 20_000_000)]
+        let index = ["/Users/me/proj": gb]
+        let result = CleanupCatalog.candidates(report: try report(index, candidates: candidates), rules: set)
+        XCTAssertEqual(result.map(\.path), ["/Users/me/proj/x"], "global araç kurulumları taşınabilir öğe olmaz")
+        XCTAssertTrue(CleanupCatalog.isExcludedCandidate("/Users/me/.nvm/a", rules: set, home: "/Users/me"))
+        XCTAssertFalse(CleanupCatalog.isExcludedCandidate("/Users/me/.nvmx", rules: set, home: "/Users/me"))
+    }
 }

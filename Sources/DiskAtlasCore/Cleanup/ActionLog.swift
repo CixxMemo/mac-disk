@@ -6,7 +6,7 @@ public struct ActionLogEntry: Codable, Equatable, Sendable {
     public var path: String
     public var bytes: Int64
     public var safety: String
-    /// `trashed`, `failed` veya `skipped`.
+    /// `moving` (taşımadan önce niyet), sonra `trashed`, `failed` veya `skipped`.
     public var result: String
     public var detail: String?
 

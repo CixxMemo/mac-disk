@@ -61,6 +61,7 @@ public final class BridgeRouter: @unchecked Sendable {
     private var cleaning = false
     private var cancelRequested = false
     private var pendingPlans: [String: PendingPlan] = [:]
+    private var cleanedScans = Set<String>()
 
     public init(store: ReportStore, rules: RuleSet, roots: ScanRoots, appInfo: AppInfo,
                 permission: @escaping @Sendable () -> PermissionStatus,
@@ -176,7 +177,11 @@ public final class BridgeRouter: @unchecked Sendable {
     private func loadScan(id: String?) throws -> Data {
         guard let id else { throw Failure(message: "Geçersiz tarama kimliği.") }
         do {
-            return try JSONEncoder().encode(DisplayEnvelope(report: try store.load(id: id), rules: rules))
+            lock.lock()
+            let stale = cleanedScans.contains(id)
+            lock.unlock()
+            return try JSONEncoder().encode(DisplayEnvelope(report: try store.load(id: id), rules: rules,
+                                                            policy: cleanupEnabled ? makePolicy() : nil, stale: stale))
         } catch ReportStoreError.invalidID {
             throw Failure(message: "Geçersiz tarama kimliği.")
         } catch ReportStoreError.notFound {
@@ -213,10 +218,7 @@ public final class BridgeRouter: @unchecked Sendable {
         catch { throw Failure(message: "Tarama okunamadı.") }
 
         // Yetki sunucudadır: izin kümesi ve korumalı yollar taramanın kataloğundan, kök bu bilgisayarın ana klasöründen gelir.
-        let home = URL(fileURLWithPath: roots.home).standardizedFileURL.path
-        let policy = TrashPolicy(home: home, applications: roots.applications,
-                                 protectedPaths: CleanupCatalog.protectedPaths(rules: rules, home: home))
-        let service = TrashService(policy: policy, trasher: trasher, log: ActionLog(url: actionLogURL))
+        let service = TrashService(policy: makePolicy(), trasher: trasher, log: ActionLog(url: actionLogURL))
         let plan = service.plan(scanId: scanId, requested: requested, allowed: CleanupCatalog.candidates(report: report, rules: rules))
 
         lock.lock()
@@ -229,6 +231,12 @@ public final class BridgeRouter: @unchecked Sendable {
         lock.unlock()
         return try JSONEncoder().encode(PlanResponse(planId: plan.id, items: plan.items, totalBytes: plan.totalBytes,
                                                      needsAcknowledge: plan.needsAcknowledge, acceptedCount: plan.acceptedCount))
+    }
+
+    private func makePolicy() -> TrashPolicy {
+        let home = URL(fileURLWithPath: roots.home).standardizedFileURL.path
+        return TrashPolicy(home: home, applications: roots.applications,
+                           protectedPaths: CleanupCatalog.protectedPaths(rules: rules, home: home))
     }
 
     private func confirmTrash(planId: String?, acknowledge: Bool) throws -> Data {
@@ -261,7 +269,13 @@ public final class BridgeRouter: @unchecked Sendable {
             lock.unlock()
         }
         do {
-            return try JSONEncoder().encode(try pending.service.execute(pending.plan, acknowledgeReview: acknowledge))
+            let outcome = try pending.service.execute(pending.plan, acknowledgeReview: acknowledge)
+            if outcome.results.contains(where: \.ok) {
+                lock.lock()
+                cleanedScans.insert(pending.plan.scanId)
+                lock.unlock()
+            }
+            return try JSONEncoder().encode(outcome)
         } catch TrashError.logUnavailable {
             throw Failure(message: "Temizlik günlüğü yazılamadığı için hiçbir şey taşınmadı.")
         } catch TrashError.nothingToDo {

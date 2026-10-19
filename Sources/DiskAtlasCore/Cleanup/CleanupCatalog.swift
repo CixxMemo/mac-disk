@@ -25,11 +25,25 @@ public enum CleanupCatalog {
             }
         }
         for candidate in report.candidates where !seen.contains(candidate.path) {
+            if isExcludedCandidate(candidate.path, rules: rules, home: apps.homePath) { continue }
             if covered.contains(where: { candidate.path == $0 || candidate.path.hasPrefix($0 + "/") }) { continue }
             seen.insert(candidate.path)
             result.append(TrashCandidate(path: candidate.path, name: candidate.name, bytes: candidate.bytes, safety: .review))
         }
         return result
+    }
+
+    /// Katalogdaki ad kurallarının `excludeUnder` yolları (global araç kurulumları gibi): bunların altındaki tarayıcı adayları
+    /// de yeniden oluşturulabilir sayılmaz ve taşınabilir öğe olmaz.
+    public static func isExcludedCandidate(_ path: String, rules: RuleSet, home: String) -> Bool {
+        let lower = path.lowercased()
+        for component in (rules.apps ?? []).flatMap(\.components) {
+            for raw in component.excludeUnder ?? [] {
+                let expanded = (raw.hasPrefix("~/") ? home + String(raw.dropFirst(1)) : raw).lowercased()
+                if lower == expanded || lower.hasPrefix(expanded + "/") { return true }
+            }
+        }
+        return false
     }
 
     /// `asla` bileşenlerin yolları (`~/` ana klasörle genişletilmiş). Bu yollar ve üst klasörleri taşınamaz.

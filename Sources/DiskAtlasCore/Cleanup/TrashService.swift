@@ -113,8 +113,8 @@ public final class TrashService: @unchecked Sendable {
                                            reason: "Bu öğe taramadaki temizlenebilir öğeler arasında değil."))
                 continue
             }
-            var item = TrashPlanItem(path: path, name: candidate.name, bytes: candidate.bytes, safety: candidate.safety, status: .rejected)
-            switch inspect(path) {
+            var item = TrashPlanItem(path: candidate.path, name: candidate.name, bytes: candidate.bytes, safety: candidate.safety, status: .rejected)
+            switch inspect(candidate.path) {
             case .failure(let failure): item.reason = failure.description
             case .success(let fingerprint):
                 item.status = .accepted
@@ -153,6 +153,15 @@ public final class TrashService: @unchecked Sendable {
                 result.reason = reason
                 logResult = "skipped"
             } else {
+                // Önce niyet günlüğe yazılır: yazılamazsa öğe taşınmaz.
+                let intent = ActionLogEntry(time: ISO8601DateFormatter().string(from: Date()), scan: plan.scanId, path: item.path,
+                                            bytes: item.bytes, safety: item.safety?.rawValue ?? "", result: "moving", detail: nil)
+                do { try log.append(intent) } catch {
+                    logBroken = true
+                    result.reason = "Günlük yazılamadığı için bu öğe taşınmadı."
+                    results.append(result)
+                    continue
+                }
                 do {
                     result.trashedTo = try trasher.trash(item.path)
                     result.ok = true
