@@ -38,11 +38,12 @@ Plan: `docs/superpowers/plans/2026-10-19-stage2-shell.md`
 - **Bitti sayılır:** `.app` kendi Mac'inizde açılıyor, tarıyor ve izin yokken doğru davranıyor. Kuzene bu aşamada gönderilmez.
 
 ## Aşama 3 — Geçmiş ve karşılaştırma
-- [ ] `Differ`: durumlar `büyüdü/küçüldü/yeni/kalktı/belirsiz`, "Diğer N öğe" hariç, eksik/okunamayan tarama `belirsiz`
-- [ ] Açıklanamayan fark satırı (disk doluluğu farkı − ölçülen fark)
-- [ ] Köprü: `listScans`, `loadScan`, `deleteScan`, `compare`
-- [ ] "Geçmiş" sekmesi: tarama listesi, iki tarama seç, sıralanabilir fark tablosu
-- [ ] Testler: aggregate, yarım tarama, okunamayan klasör, yeni/kalkan klasör
+Plan: `docs/superpowers/plans/2026-10-19-stage3-history.md`
+- [x] `Differ`: durumlar `büyüdü/küçüldü/yeni/kalktı/belirsiz`, "Diğer N öğe" hariç, eksik/okunamayan tarama `belirsiz`
+- [x] Açıklanamayan fark satırı (disk doluluğu farkı − ölçülen fark)
+- [x] Köprü: `listScans`, `loadScan`, `deleteScan`, `compare`
+- [x] "Geçmiş" sekmesi: tarama listesi, iki tarama seç, sıralanabilir fark tablosu
+- [x] Testler: aggregate, yarım tarama, okunamayan klasör, yeni/kalkan klasör
 - **Bitti sayılır:** iki gerçek tarama arasında "ne büyüdü" doğru ve yanıltıcı "silindi" göstermiyor.
 
 ## Aşama 4 — Uygulamalar ve Tanınmayan görünümleri

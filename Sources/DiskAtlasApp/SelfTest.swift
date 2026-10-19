@@ -55,11 +55,48 @@ final class SelfTest {
             results["scanMeta"] = try await evaluate("document.getElementById('scanMeta').textContent")
             results["appInfo"] = try await evaluate("document.getElementById('appInfoText').textContent")
             if let path = config.snapshotPath { try await snapshot(to: path) }
-            let dashboard = results["dashboardVisible"] as? Bool == true
-            finish(ok: dashboard, reason: dashboard ? nil : "pano görünmedi")
+            guard results["dashboardVisible"] as? Bool == true else { return finish(ok: false, reason: "pano görünmedi") }
+
+            // İkinci tarama (kök altına ≥ 2 MiB'lık bir klasör eklenir), ardından Geçmiş'te karşılaştırma.
+            if let root = config.scanRoot {
+                let folder = URL(fileURLWithPath: root).appendingPathComponent("selftest-grow")
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try Data(count: 3 * 1024 * 1024).write(to: folder.appendingPathComponent("big.bin"))
+            }
+            _ = try await evaluate("document.getElementById('scanBtn').click()")
+            guard try await waitFor("!document.getElementById('dashboard').classList.contains('hidden') && document.getElementById('scanning').classList.contains('hidden')") else {
+                return finish(ok: false, reason: "ikinci tarama bitmedi")
+            }
+            _ = try await evaluate("document.getElementById('historyNav').click()")
+            guard try await waitFor("document.getElementById('historyList').children.length >= 2") else {
+                return finish(ok: false, reason: "geçmiş listesi iki taramayı göstermedi")
+            }
+            results["historyRows"] = try await evaluate("[...document.getElementById('historyList').children].map(r => r.textContent)")
+            if let path = config.snapshotPath { try await snapshot(to: Self.suffixed(path, "-history")) }
+            _ = try await evaluate("(() => { const b = [...document.querySelectorAll('#historyList input')]; b[0].click(); b[1].click(); document.getElementById('compareBtn').click(); return true; })()")
+            guard try await waitFor("!document.getElementById('compareResult').classList.contains('hidden') && document.querySelectorAll('#compareBody tr').length >= 1") else {
+                return finish(ok: false, reason: "karşılaştırma sonucu görünmedi")
+            }
+            let rows = try await evaluate("[...document.querySelectorAll('#compareBody tr')].map(r => r.textContent)") as? [String] ?? []
+            results["compareRows"] = rows
+            results["compareSummary"] = try await evaluate("document.getElementById('compareSummary').textContent")
+            _ = try await evaluate("document.getElementById('compareResult').scrollIntoView(); true")
+            if let path = config.snapshotPath { try await snapshot(to: Self.suffixed(path, "-compare")) }
+            let grew = rows.contains { $0.contains("selftest-grow") && $0.contains("Yeni") }
+            finish(ok: grew, reason: grew ? nil : "büyüyen klasör karşılaştırmada görünmedi")
         } catch {
             finish(ok: false, reason: "\(error)")
         }
+    }
+
+    /// Koşul doğru olana kadar 0,2 sn aralıkla sorar; süre dolarsa `false` döner.
+    @MainActor private func waitFor(_ condition: String) async throws -> Bool {
+        let deadline = Date().addingTimeInterval(max(10, config.timeout / 3))
+        while Date() < deadline {
+            if try await evaluate(condition) as? Bool == true { return true }
+            try await Task.sleep(nanoseconds: 200_000_000)
+        }
+        return false
     }
 
     @MainActor private func evaluate(_ script: String) async throws -> Any? {

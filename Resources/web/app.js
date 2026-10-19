@@ -199,7 +199,7 @@ $('cancelScanBtn').onclick = cancelScan;
 $('openSettingsBtn').onclick = $('openSettingsBanner').onclick = () => bridge?.request('openFullDiskAccess').catch(error => showMessage('Ayarlar açılamadı: ' + error.message));
 // ---- Geçmiş ve karşılaştırma ----
 let historyScans = [], picked = [], compareResult = null, compareFilterName = 'all';
-const dateLabel = value => new Date(value).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const dateLabel = value => new Date(value).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const signed = delta => (delta > 0 ? '+' : delta < 0 ? '−' : '') + format(Math.abs(delta));
 const filterNames = ['all', 'grew', 'shrank', 'newgone', 'uncertain'];
 const setFilterButtons = () => filterNames.forEach(name => $('filter-' + name).classList.toggle('active', name === compareFilterName));
@@ -214,15 +214,18 @@ async function renderHistory() {
 function drawHistory() {
   const list = $('historyList'); list.replaceChildren();
   if (!historyScans.length) list.append(element('div', 'history-empty', 'Henüz kayıtlı tarama yok.'));
+  const boxes = new Map();
   for (const scan of historyScans) {
     const row = element('div', 'history-row');
     const box = element('input'); box.type = 'checkbox'; box.checked = picked.includes(scan.id); box.disabled = scan.comparable === false;
     box.setAttribute('aria-label', dateLabel(scan.created) + ' taramasını seç');
+    boxes.set(scan.id, box);
+    // Liste yeniden çizilmez (klavye odağı kaybolmasın): üçüncü seçimde en eski seçim kutusu kaldırılır.
     box.onchange = () => {
       picked = picked.filter(id => id !== scan.id);
       if (box.checked) picked.push(scan.id);
-      if (picked.length > 2) picked = picked.slice(-2);
-      drawHistory();
+      while (picked.length > 2) boxes.get(picked.shift()).checked = false;
+      $('compareBtn').disabled = picked.length !== 2;
     };
     const main = element('div', 'history-main'), title = element('div', '', dateLabel(scan.created));
     if (scan.incomplete) title.append(element('span', 'badge', 'Kısmi'));
@@ -283,7 +286,7 @@ function drawCompare() {
     const row = element('tr');
     const num = (text, cls) => element('td', 'num' + (cls ? ' ' + cls : ''), text);
     const status = element('td', '', statusLabels[item.status] + (item.reason ? ' · ' + item.reason : ''));
-    const path = element('td', '', item.path); path.setAttribute('title', item.path);
+    const path = element('td', '', shortPath(item.path)); path.setAttribute('title', item.path);
     row.append(path, num(item.before == null ? '—' : format(item.before)), num(item.after == null ? '—' : format(item.after)),
                num(signed(item.delta), item.delta > 0 ? 'pos' : 'neg'), status);
     $('compareBody').append(row);
