@@ -43,4 +43,12 @@ final class ClassifierTests: XCTestCase {
         XCTAssertEqual(rules.rules.count, 6)
         XCTAssertEqual(rules.fallback, .personal)
     }
+
+    func testRuleSetLoadFromURL() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/DiskAtlasCore/Resources/rules.json")
+        XCTAssertEqual(try RuleSet.load(from: url).rules.count, 6)
+        XCTAssertThrowsError(try RuleSet.load(from: URL(fileURLWithPath: "/nonexistent/rules.json")))
+    }
 }

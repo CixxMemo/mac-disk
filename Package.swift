@@ -10,6 +10,7 @@ let package = Package(
     ],
     targets: [
         .executableTarget(name: "disk-atlas-scan", dependencies: ["DiskAtlasCore"]),
+        .executableTarget(name: "DiskAtlasApp", dependencies: ["DiskAtlasCore"]),
         .target(name: "DiskAtlasCore", resources: [.process("Resources")]),
         .testTarget(
             name: "DiskAtlasCoreTests",

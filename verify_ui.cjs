@@ -1,84 +1,24 @@
-// DOM-level interaction checks. This does not launch a browser or touch source data.
+// DOM-level interaction checks against Resources/web using the shared fake-DOM harness.
+// This does not launch a browser or touch source data. It needs a real scan report in reports/
+// (git-ignored); without one the real-data checks are skipped.
 const fs = require('node:fs');
-const vm = require('node:vm');
-const assert = require('node:assert/strict');
 const path = require('node:path');
+const assert = require('node:assert/strict');
+const { boot } = require('./Tests/web/harness.cjs');
 
-const html = fs.readFileSync(path.join(__dirname, 'Disk-Atlas.html'), 'utf8');
-const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
-assert.equal(scripts.length, 1);
-const source = scripts[0][1];
-new vm.Script(source);
-let document;
-let copiedText = '';
-class Node {
-  constructor(tag = 'div') {
-    this.tagName = tag.toLowerCase(); this.children = []; this.style = {}; this.attrs = {};
-    this.dataset = {}; this.value = ''; this.className = ''; this.disabled = false; this._text = '';
-  }
-  get classList() {
-    const tokens = () => new Set(this.className.split(/\s+/).filter(Boolean));
-    return {
-      contains: name => tokens().has(name),
-      add: (...names) => { const set = tokens(); names.forEach(n => set.add(n)); this.className = [...set].join(' '); },
-      remove: (...names) => { const set = tokens(); names.forEach(n => set.delete(n)); this.className = [...set].join(' '); },
-      toggle: (name, force) => { const set = tokens(); const enabled = force ?? !set.has(name); enabled ? set.add(name) : set.delete(name); this.className = [...set].join(' '); return enabled; }
-    };
-  }
-  setAttribute(name, value) {
-    this.attrs[name] = String(value);
-    if (name === 'class') this.className = String(value);
-    if (name === 'id') this.id = String(value);
-    if (name === 'disabled') this.disabled = true;
-    if (name.startsWith('data-')) this.dataset[name.slice(5)] = String(value);
-  }
-  removeAttribute(name) { delete this.attrs[name]; }
-  append(...items) { for (const item of items) { const node = typeof item === 'string' ? document.createTextNode(item) : item; node.parent = this; this.children.push(node); } }
-  replaceChildren(...items) { this.children.forEach(n => { n.parent = null; }); this.children = []; this._text = ''; this.append(...items); }
-  remove() { if (this.parent) this.parent.children = this.parent.children.filter(n => n !== this); this.parent = null; }
-  focus() { document.activeElement = this; }
-  select() {}
-  click() { return this.onclick?.({ target: this }); }
-  getBoundingClientRect() { return { width: 720, height: 460, x: 0, y: 0 }; }
-  get textContent() { return this._text + this.children.map(n => n.textContent).join(''); }
-  set textContent(value) { this.children = []; this._text = String(value); }
-  querySelectorAll(selector) {
-    const result = [];
-    const matches = node => selector.split(',').some(raw => {
-      const part = raw.trim();
-      if (part.startsWith('.')) return node.classList.contains(part.slice(1));
-      const tag = part.split(/[:\[]/)[0];
-      return node.tagName === tag && (!part.includes(':not([disabled])') || !node.disabled) && (!part.includes('[href]') || node.attrs.href);
-    });
-    const walk = node => node.children.forEach(child => { if (matches(child)) result.push(child); walk(child); });
-    walk(this); return result;
-  }
-}
-const byId = new Map();
-document = {
-  body: new Node('body'), activeElement: null, handlers: {},
-  getElementById: id => { assert(byId.has(id), `Missing DOM id: ${id}`); return byId.get(id); },
-  createElement: tag => new Node(tag), createElementNS: (_, tag) => new Node(tag),
-  createTextNode: text => { const node = new Node('#text'); node.textContent = text; return node; },
-  querySelectorAll: selector => document.body.querySelectorAll(selector),
-  addEventListener: (event, handler) => { document.handlers[event] = handler; }, execCommand: () => true
-};
-document.activeElement = document.body;
-for (const match of html.slice(0, html.indexOf('<script>')).matchAll(/<([a-z][\w:-]*)([^<>]*?)>/gi)) {
-  const node = new Node(match[1]);
-  for (const attr of match[2].matchAll(/([\w:-]+)(?:="([^"]*)")?/g)) node.setAttribute(attr[1], attr[2] ?? '');
-  if (node.id) { assert(!byId.has(node.id), `Duplicate id ${node.id}`); byId.set(node.id, node); }
-  document.body.append(node);
-}
-const context = vm.createContext({
-  document, navigator: { clipboard: { writeText: async value => { copiedText = value; } } },
-  ResizeObserver: class { observe() {} }, requestAnimationFrame: callback => callback(),
-  setTimeout: () => 1, clearTimeout() {}, console
-});
-vm.runInContext(source, context);
-const run = code => vm.runInContext(code, context);
-const get = id => byId.get(id);
+const reports = path.join(__dirname, 'reports');
+const names = fs.existsSync(reports) ? fs.readdirSync(reports).filter(x => /^disk-atlas-.*\.json$/.test(x)).sort() : [];
+if (!names.length) { console.log('SKIPPED: reports/ altında gerçek rapor yok.'); process.exit(0); }
+const original = names.at(-1);
+const raw = fs.readFileSync(path.join(reports, original), 'utf8');
+
+const env = boot();
+const { html, source, document, sandbox: context } = env;
+const { run, get } = env;
 const log = text => console.log('PASS:', text);
+// Eski gömülü açılışın yerine: gerçek raporu dosya kipinde yükle.
+run(`load(${raw})`);
+Object.defineProperty(global, 'copiedText', { get: () => env.copied() });
 
 async function main() {
   assert(!get('dashboard').classList.contains('hidden'));
@@ -152,8 +92,6 @@ async function main() {
   assert.equal(run('squarify([{bytes:0}],0,0,100,100).length'), 0);
   log('treemap area conservation, non-overlap and bounds at mobile/tablet/desktop widths');
 
-  const original = fs.readdirSync(path.join(__dirname,'reports')).filter(x=>/^disk-atlas-.*\.json$/.test(x)).sort().at(-1);
-  const raw = fs.readFileSync(path.join(__dirname,'reports',original),'utf8');
   await get('fileInput').onchange({target:{files:[{size:Buffer.byteLength(raw),text:async()=>raw}],value:'test'}});
   assert(!get('message').textContent.includes('Rapor açılamadı'));
   assert(run('findings.some(x=>x.name === "Android SDK")'));
