@@ -122,8 +122,16 @@ public final class DiskScanner {
     private static let scanStackSize = 64 * 1024 * 1024
 
     private func execute(isCancelled: @escaping () -> Bool, progress: ((ScanProgress) -> Void)?) throws -> Report {
-        let root = URL(fileURLWithPath: options.root).standardizedFileURL.path
-        guard let rootStat = try? fileSystem.lstat(root) else { throw ScanFailure.rootUnreadable(options.root) }
+        var root = URL(fileURLWithPath: options.root).standardizedFileURL.path
+        guard var rootStat = try? fileSystem.lstat(root) else { throw ScanFailure.rootUnreadable(options.root) }
+        if rootStat.kind == .symlink {
+            // Kök bir sembolik bağlantıysa (örn. /tmp) hedefi taranır; kökün altındakiler yine izlenmez.
+            guard let resolved = Self.realPath(root), let resolvedStat = try? fileSystem.lstat(resolved) else {
+                throw ScanFailure.rootUnreadable(options.root)
+            }
+            root = resolved
+            rootStat = resolvedStat
+        }
         reset(rootDevice: rootStat.device, isCancelled: isCancelled, progress: progress)
         guard let tree = scan(path: root, depth: 0, inherited: nil, insideCandidate: false, stat: rootStat),
               !rootFailed else {
@@ -161,11 +169,19 @@ public final class DiskScanner {
         unreadable = []
         categories = Dictionary(uniqueKeysWithValues: DiskCategory.allCases.map { ($0.rawValue, Int64(0)) })
         seenLinks = []
-        excluded = Set(options.excludedPaths + options.excludedPaths.map { options.dataVolumePrefix + $0 })
+        // Kökle aynı biçimde normalleştirilir (Foundation /private/var yerine /var yazar).
+        let normalized = options.excludedPaths.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
+        excluded = Set(normalized + normalized.map { options.dataVolumePrefix + $0 })
         largest = LargestFiles()
         serial = 0
         candidates = []
         folderIndex = [:]
+    }
+
+    private static func realPath(_ path: String) -> String? {
+        guard let resolved = realpath(path, nil) else { return nil }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 
     private static func timestamp(_ date: Date) -> String {
@@ -177,6 +193,7 @@ public final class DiskScanner {
     }
 
     /// `shutil.disk_usage` ile aynı hesap: toplam, kullanılabilir (`f_bavail`) ve kullanılan (`f_blocks - f_bfree`).
+    /// `statvfs` başarısız olursa üçü de 0 döner; arayüz `total == 0` durumunu işlemelidir.
     private static func diskUsage(at path: String) -> DiskUsage {
         var info = statvfs()
         guard statvfs(path, &info) == 0 else { return DiskUsage(total: 0, free: 0, used: 0) }

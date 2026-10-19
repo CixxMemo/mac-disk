@@ -28,5 +28,9 @@ public struct ScanProgress: Sendable, Equatable {
 public enum ScanFailure: Error, Equatable, CustomStringConvertible {
     case rootUnreadable(String)
 
-    public var description: String { "Tarama kökü okunamadı; rapor oluşturulmadı." }
+    public var description: String {
+        switch self {
+        case .rootUnreadable(let path): return "Tarama kökü okunamadı: \(path). Rapor oluşturulmadı."
+        }
+    }
 }

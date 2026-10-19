@@ -71,6 +71,37 @@ final class ScannerCoreTests: XCTestCase {
         }
     }
 
+    func testExcludedPathMatchesRootInAnotherSpelling() throws {
+        let tree = try TempTree()
+        let keep = try tree.file("keep/a.bin", size: 4000)
+        try tree.file("reports/b.bin", size: 4000)
+        // /var ve /private/var aynı dizindir; dışlama yazım biçiminden bağımsız çalışmalı.
+        let spelled = tree.path("reports").hasPrefix("/private") ? String(tree.path("reports").dropFirst("/private".count))
+                                                                   : "/private" + tree.path("reports")
+        let report = try scan(tree, excluded: [spelled])
+        XCTAssertEqual(report.tree.bytes, TestSupport.allocated(keep))
+    }
+
+    func testSymlinkRootIsResolved() throws {
+        let tree = try TempTree()
+        let file = try tree.file("real/a.bin", size: 4000)
+        try tree.symlink("link", to: tree.path("real"))
+        let report = try DiskScanner(options: ScanOptions(root: tree.path("link")),
+                                     classifier: try TestSupport.classifier()).run()
+        XCTAssertEqual(report.tree.bytes, TestSupport.allocated(file))
+        XCTAssertEqual(report.stats.symlinks, 0)
+    }
+
+    func testRootFailureMessageNamesThePath() throws {
+        let missing = "/nonexistent-\(UUID().uuidString)"
+        let scanner = DiskScanner(options: ScanOptions(root: missing), classifier: try TestSupport.classifier())
+        XCTAssertThrowsError(try scanner.run()) { error in
+            let message = (error as? ScanFailure)?.description ?? ""
+            XCTAssertTrue(message.contains(missing), message)
+            XCTAssertTrue(message.contains("Tarama kökü okunamadı"), message)
+        }
+    }
+
     func testUnreadableRootThrowsRootUnreadable() throws {
         let tree = try TempTree()
         try tree.file("a.bin", size: 100)
@@ -86,7 +117,8 @@ final class ScannerCoreTests: XCTestCase {
         let names = ["cafe\u{301}.txt", "with space.txt", "new\nline.txt", "emoji-\u{1F600}.txt"]
         for name in names { try tree.file(name, size: 100) }
         let report = try scan(tree)
-        XCTAssertEqual(Set(report.tree.children?.map(\.name) ?? []), Set(names))
+        // Swift String == Unicode eşdeğerliğine bakar; adların bayt olarak korunduğunu UTF-8 ile doğrula.
+        XCTAssertEqual(Set(report.tree.children?.map { Array($0.name.utf8) } ?? []), Set(names.map { Array($0.utf8) }))
         XCTAssertEqual(report.stats.files, names.count)
         XCTAssertEqual(report.stats.errors, 0)
     }

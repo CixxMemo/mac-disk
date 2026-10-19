@@ -164,6 +164,19 @@ final class ScannerReportTests: XCTestCase {
         XCTAssertFalse(report.measurement.caveat.isEmpty)
     }
 
+    func testRepeatedScansAreIdentical() throws {
+        let tree = try TempTree()
+        let first = try tree.file("a.bin", size: 4000)
+        try tree.hardlink("b.bin", to: first)
+        try tree.hardlink("c.bin", to: first)
+        for i in 0..<50 { try tree.file("many/f\(i).bin", size: 4000) }
+        var one = try scan(tree), two = try scan(tree)
+        one.created = ""; two.created = ""; one.seconds = 0; two.seconds = 0
+        XCTAssertEqual(one, two)
+        // Sabit bağlantılarda bayt sırasına göre ilk ad ("a.bin") sayılır.
+        XCTAssertEqual(one.tree.children?.map(\.name).filter { ["a.bin", "b.bin", "c.bin"].contains($0) }, ["a.bin"])
+    }
+
     func testOutputRoundTripsThroughCodec() throws {
         let tree = try TempTree()
         try tree.file("node_modules/x.bin", size: 4000)

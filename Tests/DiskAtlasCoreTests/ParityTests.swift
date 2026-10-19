@@ -12,6 +12,15 @@ final class ParityTests: XCTestCase {
     private func runPython(on root: String) throws -> [String: Any] {
         let python = "/usr/bin/python3"
         guard FileManager.default.isExecutableFile(atPath: python) else { throw XCTSkip("python3 yok") }
+        // Komut Satırı Araçları yoksa /usr/bin/python3 yalnızca bir yer tutucudur ve kurulum penceresi açar.
+        let probe = Process()
+        probe.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
+        probe.arguments = ["-p"]
+        probe.standardOutput = Pipe()
+        probe.standardError = Pipe()
+        try probe.run()
+        probe.waitUntilExit()
+        guard probe.terminationStatus == 0 else { throw XCTSkip("Komut Satırı Araçları kurulu değil") }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: python)
         process.arguments = [repoRoot.appendingPathComponent("Tests/Parity/py_scan.py").path, root]
@@ -73,6 +82,7 @@ final class ParityTests: XCTestCase {
         try tree.file(".cache/c.bin", size: 4000)
         try tree.file("Applications/Foo.app/Contents/bin", size: 8000)
         for i in 0..<45 { try tree.file("many/f\(i).bin", size: 4096 * i + 1) }
+        try tree.file("deep/a/b/c/d/e/f/g/h/i/j/leaf.bin", size: 4000)
         try tree.dir("empty")
         try tree.symlink("link", to: tree.path("docs/readme.txt"))
 
