@@ -1,6 +1,6 @@
 # Disk Atlas — macOS uygulaması tasarım belgesi
 
-Tarih: 2026-10-19 · Durum: **5 karar işlendi, belge incelemesi sürüyor** (kod yazılmadı)
+Tarih: 2026-10-19 · Durum: **6 karar işlendi; 1–3. aşamalar uygulandı** (kod yazıldı)
 
 ## 1. Anlayış (düzeltmeniz için)
 
@@ -200,4 +200,4 @@ Her mesaj `{id, type, payload}`. Swift her gelen mesajı doğrular; JS'e güveni
 3. Mevcut Python dosyaları **taşınmaz**, proje kökünde yerinde kalır. **Taşınmasın.**
 4. `git init` + `.gitignore` yapılır. `reports/`, üretilmiş `Disk-Atlas.html` (kişisel yollar içerir), `Disk-Atlas.onceki.html`, `*.app`, `.build/` git dışında kalır. **Evet.**
 5. Temizlik 5. aşamaya ertelenir; 1–4. aşamalar kendi Mac'inizde sağlam çalışana kadar eklenmez (kuzen testi yalnızca en sonda, nihai ürünle). **Evet.**
-6. Boyutlar macOS ile aynı **ondalık birimle (GB, 1 GB = 1.000.000.000 bayt)** gösterilir; GB ve üstü iki, KB/MB bir ondalıkla. "Ölçülen" kartı, kullanılan alandan ölçülemeyen kısmı (macOS sistem birimi, anlık görüntüler, korumalı alanlar) ayrıca yazar. (2026-10-19, kullanıcı isteği; Drive kopyası bu maddeyi içermez.)
+6. Boyutlar macOS ile aynı **ondalık birimle (GB, 1 GB = 1.000.000.000 bayt)** gösterilir; GB ve üstü iki, KB/MB bir ondalıkla. "Ölçülen" kartı, kullanılan alandan ölçülemeyen kısmı (macOS sistem birimi, anlık görüntüler, korumalı alanlar) ayrıca yazar. (2026-10-19, kullanıcı isteği.)
