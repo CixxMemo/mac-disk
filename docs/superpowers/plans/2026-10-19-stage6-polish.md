@@ -39,7 +39,7 @@
 **Files:** Create `scripts/make_icon.py`, `Resources/AppIcon.icns`; Modify `scripts/Info.plist.template`, `scripts/build_app.sh`; Test `scripts/check_dist.sh` (Task 3'te genişler).
 
 **Interfaces:**
-- Produces: `python3 scripts/make_icon.py <çıkış.icns>` — 1024 px ana çizimden 16, 32, 64, 128, 256, 512, 1024 (ve @2x karşılıkları) boyutlu `.iconset` üretir, `iconutil -c icns` ile birleştirir.
+- Produces: `python3 scripts/make_icon.py <çıkış.icns>` — 1024 px ana çizimden 16, 32, 128, 256, 512 (ve her birinin @2x karşılığı, en büyüğü 1024) boyutlu 10 dosyalı `.iconset` üretir, `iconutil -c icns` ile birleştirir.
 - Produces: `Info.plist`'e `CFBundleIconFile` = `AppIcon`; `build_app.sh` `Resources/AppIcon.icns` dosyasını pakete `Contents/Resources/AppIcon.icns` olarak kopyalar.
 
 - [ ] **Step 1: Test** — `scripts/check_dist.sh` içinde (henüz yok, önce yaz): `dist/DiskAtlas.app/Contents/Resources/AppIcon.icns` var mı ve `Info.plist` `CFBundleIconFile` = `AppIcon` mu. Çalıştır → FAIL (dosya yok).
@@ -53,7 +53,7 @@
 
 **Interfaces:**
 - `docs/OKU-BENI.md` bölümleri: Ne işe yarar / ne yapmaz (yalnızca ad, yol, boyut okur; içerik açmaz; ağa bir şey göndermez; silme yalnızca onaylı Çöp Sepeti'ne taşıma); **İlk açılış** (zip'i aç, uygulamayı Uygulamalar'a taşı, çift tıkla, uyarı → Ayarlar → Gizlilik ve Güvenlik → "Yine de Aç"; olmazsa `xattr -dr com.apple.quarantine /Applications/DiskAtlas.app`); **Tam Disk Erişimi** (neden, nasıl, izin verdikten sonra uygulamayı yeniden aç); **Kullanım** (Tara, sekmeler, Çöp Sepeti'ne taşıma ve Geri Koy, "Yer açmaz" uyarısı); **Dosyalar** (`~/Library/Application Support/DiskAtlas/scans` ve `actions.log`; silmek serbest); **Sorun olursa** ("Tarama bilgisi" sekmesinin ekran görüntüsü + macOS sürümü).
-- `build_app.sh`: varsayılan sürüm onaylanan değer; zip, `DiskAtlas.app` ve `OKU-BENI.md` içeren bir klasörü `ditto -c -k --norsrc --keepParent` ile paketler (`dist/DiskAtlas.zip`).
+- `build_app.sh`: varsayılan sürüm onaylanan değer; zip, `DiskAtlas.app` ve `OKU-BENI.md` içeren bir klasörü `ditto -c -k --norsrc --keepParent` ile paketler (`dist/DiskAtlas-<sürüm>.zip`).
 
 - [ ] **Step 1: Test** — `check_dist.sh`: zip'i geçici klasöre açar; `DiskAtlas.app` ve `OKU-BENI.md` var; `codesign --verify --strict` zip'ten açılan kopyada geçer; `Info.plist` sürümü `OKU-BENI.md`'de yazan sürümle aynı; kılavuzdaki `xattr` komutu ile Ayarlar yolu metinleri (`Yine de Aç`, `Tam Disk Erişimi`) bulunur. → FAIL.
 - [ ] **Step 2:** Kılavuzu yaz (≤ 1 sayfa, madde madde), `build_app.sh`'yi güncelle.

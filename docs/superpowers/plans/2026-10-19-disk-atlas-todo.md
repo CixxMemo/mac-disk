@@ -67,9 +67,13 @@ Plan: `docs/superpowers/plans/2026-10-19-stage5-cleanup.md` — kod tamamlandı;
 - **Bitti sayılır:** seçilen güvenli öğeler Çöp Sepeti'ne gider, "Geri Koy" çalışır, yasaklı yollar reddedilir.
 
 ## Aşama 6 — Cila ve dağıtım
-- [ ] Kısa Türkçe `OKU-BENI.md` (Yine de Aç, Tam Disk Erişimi, `xattr` yedeği); kuzen teknik biri olduğu için resimli rehber gerekmez
-- [ ] **Nihai ürünü kuzene gönder (tek deneme):** uyarı + izin + tarama (sizin elinizde); sorun çıkarsa düzeltip yeni zip
-- [ ] Gerekirse performans ölçümü; yavaşsa paralel tarama (deterministik sıralamayı bozmadan) değerlendirilir
+Plan: `docs/superpowers/plans/2026-10-19-stage6-polish.md` — kod/paket tamamlandı; kuzene gönderme sizde
+- [x] Uygulama simgesi (`scripts/make_icon.py`, `Resources/AppIcon.icns`)
+- [x] Sürüm 1.0.0; kısa Türkçe `OKU-BENI.md` (Yine de Aç, Tam Disk Erişimi, `xattr` yedeği); zip: `DiskAtlas-1.0.0.zip` = `DiskAtlas.app` + `OKU-BENI.md`
+- [x] `scripts/check_dist.sh` paket doğrulaması
+- [-] Koyu tema ve paralel tarama: kapsam dışı (karar)
+- [ ] **Sizin denemeniz:** uygulamada küçük, güvenli bir öğeyi Çöp Sepeti'ne taşıyıp Çöp Sepeti'nde görün, "Geri Koy"u deneyin
+- [ ] **Nihai ürünü kuzene gönder (tek deneme):** `dist/DiskAtlas-1.0.0.zip`; sorun çıkarsa ekran görüntüsüyle düzeltip yeni zip
 
 ---
 

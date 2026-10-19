@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds dist/DiskAtlas.app (ad-hoc signed, not notarized) and dist/DiskAtlas.zip.
+# Builds dist/DiskAtlas.app (ad-hoc signed, not notarized) and dist/DiskAtlas-<VERSION>.zip.
 # Usage: scripts/build_app.sh [VERSION]
 set -euo pipefail
 cd "$(dirname "$0")/.."
