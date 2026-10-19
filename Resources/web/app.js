@@ -349,10 +349,11 @@ function renderApps() {
     head.append(dot, element('span', 'app-name', app.name), element('span', 'app-size', format(app.bytes)), bar, element('span', 'chev', ''));
     const details = element('div', 'app-details' + (open ? '' : ' hidden'));
     details.append(...app.components.map(componentBlock));
+    let isOpen = open;   // DOM'dan okunmaz (sahte ve gerçek DOM aynı davranır)
     head.onclick = () => {
-      const now = head.attrs['aria-expanded'] !== 'true';
-      head.setAttribute('aria-expanded', String(now)); details.classList.toggle('hidden', !now);
-      if (now) expandedApps.add(app.id); else expandedApps.delete(app.id);
+      isOpen = !isOpen;
+      head.setAttribute('aria-expanded', String(isOpen)); details.classList.toggle('hidden', !isOpen);
+      if (isOpen) expandedApps.add(app.id); else expandedApps.delete(app.id);
     };
     row.append(head, details); list.append(row);
   }

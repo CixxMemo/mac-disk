@@ -47,12 +47,12 @@ Plan: `docs/superpowers/plans/2026-10-19-stage3-history.md`
 - **Bitti sayılır:** iki gerçek tarama arasında "ne büyüdü" doğru ve yanıltıcı "silindi" göstermiyor.
 
 ## Aşama 4 — Uygulamalar ve Tanınmayan görünümleri
-Plan: `docs/superpowers/plans/2026-10-19-stage4-apps.md` — **onay bekliyor** (kod yazılmadı)
-- [ ] G1: `rules.json`'a araç/bileşen kataloğu (Android, Xcode, JavaScript, Python, Gradle/Maven, Flutter, Rust, Homebrew, Docker, VS Code, JetBrains, yerel AI modelleri, tarayıcılar, kişisel klasörler, yedekler, Çöp Sepeti, yüklü uygulamalar...) ve her bileşen için nedir / neden bu türde / silinirse ne olur + güvenlik düzeyi; doğrulama testleri
-- [ ] G2: `AppCatalog`: `folderIndex`'i kurallarla eşleştir, çifte sayımı önle (en özel yol kazanır), `names`/`children` kuralları, **Tanınmayan** klasör listesi; testler ve gerçek veride (salt okunur) doğrulama
-- [ ] G3: Kullanıcı klasörünü gerçek kullanıcıdan türet (`Report.homePath`); `loadScan` yanıtına `apps` ve `ui.findings` ekle (`build_ui.py`'deki sabit `specs` mantığının yerine)
-- [ ] G4: "Uygulamalar" sekmesi (gruplar, açılır bileşenler, güvenlik rozeti, "Haritada göster", arama) ve "Tanınmayan" sekmesi (tablo, arama, yolu kopyala); Python raporunda gizli
-- [ ] G5: Uygulamada uçtan uca self-test + ekran görüntüleri, paketleme, belgeler
+Plan: `docs/superpowers/plans/2026-10-19-stage4-apps.md` — tamamlandı
+- [x] G1: `rules.json`'a araç/bileşen kataloğu (Android, Xcode, JavaScript, Python, Gradle/Maven, Flutter, Rust, Homebrew, Docker, VS Code, JetBrains, yerel AI modelleri, tarayıcılar, kişisel klasörler, yedekler, Çöp Sepeti, yüklü uygulamalar...) ve her bileşen için nedir / neden bu türde / silinirse ne olur + güvenlik düzeyi; doğrulama testleri
+- [x] G2: `AppCatalog`: `folderIndex`'i kurallarla eşleştir, çifte sayımı önle (en özel yol kazanır), `names`/`children` kuralları, **Tanınmayan** klasör listesi; testler ve gerçek veride (salt okunur) doğrulama
+- [x] G3: Kullanıcı klasörünü gerçek kullanıcıdan türet (`Report.homePath`); `loadScan` yanıtına `apps` ve `ui.findings` ekle (`build_ui.py`'deki sabit `specs` mantığının yerine)
+- [x] G4: "Uygulamalar" sekmesi (gruplar, açılır bileşenler, güvenlik rozeti, "Haritada göster", arama) ve "Tanınmayan" sekmesi (tablo, arama, yolu kopyala); Python raporunda gizli
+- [x] G5: Uygulamada uçtan uca self-test + ekran görüntüleri, paketleme, belgeler
 - **Bitti sayılır:** geliştirici olmayan bir Mac'te de anlamlı gruplar çıkıyor; her satır açıklanıyor; bileşenler toplamı ölçülen alanı aşmıyor; Tanınmayan listesi sistem ve tanınmış klasörleri tekrarlamıyor.
 
 ## Aşama 5 — Temizlik (Çöp Sepeti)

@@ -183,7 +183,8 @@ public final class BridgeRouter: @unchecked Sendable {
 
         let options = ScanOptions(root: root, excludedPaths: roots.excluded + [store.directoryPath], progressInterval: 1)
         let access = permission()
-        let home = classifier.displayPath(roots.home)
+        // Tarayıcı kökü `standardizedFileURL` ile normalleştirir; ana klasör de aynı biçimde saklanır.
+        let home = classifier.displayPath(URL(fileURLWithPath: roots.home).standardizedFileURL.path)
         DispatchQueue.global(qos: .userInitiated).async { [self] in
             let finalEvent: [String: Any]
             do {

@@ -313,4 +313,19 @@ final class BridgeRouterTests: XCTestCase {
         XCTAssertNil(data["ui"])
         XCTAssertNotNil(data["tree"])
     }
+
+    func testHomePathIsNormalizedLikeTheScannerRoot() throws {
+        // Foundation /private/var yerine /var yazar; ana klasör de aynı biçimde saklanmalı.
+        try tree.dir("home")   // /private öneki yalnızca yol varsa kaldırılır
+        let spelled = "/private" + tree.path("home")
+        let report = try fixtureReport()
+        let log = self.log!
+        let router = BridgeRouter(store: store, rules: try RuleSet.bundled(),
+                                  roots: ScanRoots(data: tree.path(), home: spelled, excluded: []),
+                                  appInfo: AppInfo(version: "1", macOS: "1"), permission: { .granted }, openFullDiskAccess: {},
+                                  emit: { log.append($0) }, runner: { _, _, _, _ in report })
+        XCTAssertEqual(try send(router, "startScan", ["scope": "data"])["ok"] as? Bool, true)
+        let done = try XCTUnwrap(log.wait(for: "scanDone"))
+        XCTAssertEqual(try store.load(id: try XCTUnwrap(done["id"] as? String)).homePath, tree.path("home"))
+    }
 }
