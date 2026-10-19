@@ -14,7 +14,8 @@ Tarih: 2026-10-19 · Durum: **5 karar işlendi, belge incelemesi sürüyor** (ko
 - Tek tıkla silme istiyorsunuz.
 
 **Benim varsayımlarım (yanlışsa söyleyin)**
-- Hedef makine Apple Silicon (M4) ve macOS 15+. Uygulama macOS 14+ için derlenir.
+- Hedef makine Apple Silicon (M4) ve büyük olasılıkla en son macOS sürümü. Uygulama macOS 14+ için derlenir. Sizin geliştirme Mac'iniz macOS 15.7'de olduğundan en son sürümde ayrıca test edilemez.
+- Kuzen teknik bilgisi yüksek biri; güvenlik uyarısını kendisi aşabilir.
 - Arayüz Türkçe kalır (İngilizce sonraya).
 - Kuzen geliştirici olmayabilir. Bu yüzden uygulama geliştirici araçlarına özel değil, genel kullanıcı için de anlamlı olmalı.
 - Silme "tek tıkla" olacak ama **yalnızca Çöp Sepeti'ne taşıma** ve onay penceresiyle. Kalıcı silme yok.
@@ -122,7 +123,7 @@ Her mesaj `{id, type, payload}`. Swift her gelen mesajı doğrular; JS'e güveni
 | **Tanınmayan** | Hiçbir kurala uymayan en büyük klasörler. Kuralları geliştirmek için de veri sağlar. |
 | **Büyük dosyalar** | En büyük 150 dosya. Mevcut. |
 | **Geçmiş** | Tarama listesi, iki tarama seç → karşılaştırma tablosu (sıralanabilir: en çok büyüyen) + açıklanamayan fark satırı. |
-| **Tarama bilgisi** | Kapsam, hatalar, sınırlar. Mevcut. |
+| **Tarama bilgisi** | Kapsam, hatalar, sınırlar, macOS ve uygulama sürümü. |
 
 ### 4.3 Aşama 2: Temizlik
 - Satırlarda onay kutusu (şimdiki "inceleme listesi" gibi), altta **"Çöp Sepeti'ne taşı"** düğmesi.
@@ -162,7 +163,7 @@ Her mesaj `{id, type, payload}`. Swift her gelen mesajı doğrular; JS'e güveni
 
 ## 7. Dağıtım (kuzene)
 - `scripts/build_app.sh` → `DiskAtlas.app` kurar, **ad-hoc imzalar** (`codesign -s -`; Apple Silicon'da çalışmak için yeterli), `DiskAtlas.zip` üretir.
-- İmzasız/notarize edilmemiş olduğu için kuzende **ilk açılışta uyarı** çıkar. macOS 15'te: *Sistem Ayarları → Gizlilik ve Güvenlik → "Yine de Aç"*. Yedek: Terminal'de `xattr -cr DiskAtlas.app`. Türkçe, resimli bir `OKU-BENI.md` hazırlanır.
+- İmzasız/notarize edilmemiş olduğu için kuzende **ilk açılışta uyarı** çıkar. macOS 15'te: *Sistem Ayarları → Gizlilik ve Güvenlik → "Yine de Aç"*. Yedek: Terminal'de `xattr -cr DiskAtlas.app`. Kısa bir `OKU-BENI.md` yeterli (kuzen teknik biri, resimli rehber gerekmez).
 - **Tam Disk Erişimi** macOS tarafından programatik olarak istenemez. Uygulama izni algılar, yoksa rehber ekran gösterir ve doğrudan ilgili ayar sayfasını açar. Kuzen elle uygulamayı listeye ekleyip açar, uygulamayı yeniden başlatır.
 - Güncelleme: yeni zip gönderilir (otomatik güncelleme yok).
 - Dürüst sınır: "tıkla ve çalışsın" ifadesi ilk kurulumdaki bu iki adım (uyarı + izin) hariç doğrudur.
@@ -181,13 +182,13 @@ Her mesaj `{id, type, payload}`. Swift her gelen mesajı doğrular; JS'e güveni
 | Tam Disk Erişimi olmadan eksik tarama | İzin rehberi, "kısmi tarama" işareti, okunamayan yolların tam listesi |
 | Yanlış silme | Yalnızca Çöp Sepeti, izin listesi, yeniden kontrol, onay, günlük |
 | Hardlink sayımı sıraya bağlı | v1'de tek iş parçacığı (deterministik); paralelleşirse yeniden ele alınır |
-| Gatekeeper uyarısı kuzeni durdurur | Resimli rehber, `xattr` yedeği |
-| Dosya sistemi API'leri macOS sürümüne göre değişir | Testler, kuzenin Mac'inde deneme |
+| Gatekeeper uyarısı ilk açılışta çıkar (kuzen teknik biri, kendisi aşabilir) | Kısa OKU-BENI, `xattr` yedeği |
+| Dosya sistemi API'leri ve izin davranışı macOS sürümüne göre değişir; kuzen sizden daha yeni bir macOS kullanıyor olabilir | Testler, Tarama bilgisi sayfasında macOS ve uygulama sürümü, kuzenin Mac'inde tek deneme |
 | Çöp Sepeti'ne taşıma yer açmaz | Arayüzde açık uyarı |
 
 ## 10. Aşamalar (her biri ayrı plan/onay döngüsü)
 1. **Çekirdek**: Swift paketi, Scanner + Classifier + şema + Python eşdeğerlik testleri; JSON içe aktarma.
-2. **Uygulama kabuğu**: WebView, köprü, tarama ekranı, izin rehberi, `build_app.sh`. *Kuzende ilk deneme.*
+2. **Uygulama kabuğu**: WebView, köprü, tarama ekranı, izin rehberi, `build_app.sh`. *Kendi Mac'inizde ilk kurulum simülasyonu (karantina bayrağı, izinsiz tarama).*
 3. **Geçmiş ve karşılaştırma**.
 4. **Uygulamalar ve Tanınmayan görünümleri** (`rules.json`).
 5. **Temizlik** (Çöp Sepeti).
@@ -198,4 +199,4 @@ Her mesaj `{id, type, payload}`. Swift her gelen mesajı doğrular; JS'e güveni
 2. Minimum macOS **14**. **Uygun.** (Kuzende 15+ olmalı.)
 3. Mevcut Python dosyaları **taşınmaz**, proje kökünde yerinde kalır. **Taşınmasın.**
 4. `git init` + `.gitignore` yapılır. `reports/`, üretilmiş `Disk-Atlas.html` (kişisel yollar içerir), `Disk-Atlas.onceki.html`, `*.app`, `.build/` git dışında kalır. **Evet.**
-5. Temizlik 5. aşamaya ertelenir; 1–4. aşamalar kuzende sağlam çalışana kadar eklenmez. **Evet.**
+5. Temizlik 5. aşamaya ertelenir; 1–4. aşamalar kendi Mac'inizde sağlam çalışana kadar eklenmez (kuzen testi yalnızca en sonda, nihai ürünle). **Evet.**
