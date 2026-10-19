@@ -165,7 +165,7 @@ test('history lists scans newest first with badges', async () => {
   assert(visible(env, 'view-history') && !visible(env, 'view-explorer'));
   assert.equal(rows(env).length, 3);
   const texts = rows(env).map(row => row.textContent);
-  assert(texts[0].includes('GiB') && !texts[0].includes('Kısmi'), texts[0]);
+  assert(texts[0].includes('GB') && !texts[0].includes('Kısmi'), texts[0]);
   assert(texts[1].includes('Kısmi') && texts[1].includes('İzinsiz'), texts[1]);
   assert(texts[2].includes('Karşılaştırılamaz'), texts[2]);
 });
@@ -189,7 +189,7 @@ test('compare sends both ids and renders a table sorted as delivered with signed
   assert(visible(env, 'compareResult'));
   const body = env.get('compareBody').children;
   assert.equal(body.length, 3);
-  assert(body[0].textContent.includes('/Users/x/Library') && body[0].textContent.includes('+') && body[0].textContent.includes('GiB'), body[0].textContent);
+  assert(body[0].textContent.includes('/Users/x/Library') && body[0].textContent.includes('+') && body[0].textContent.includes('GB'), body[0].textContent);
   assert(body[1].textContent.includes('−') && body[1].textContent.includes('Kalktı'), body[1].textContent);
   assert(body[1].textContent.includes('—'), 'after of a gone folder is a dash');
 });
@@ -315,4 +315,37 @@ test('deleting the scan that is open in the dashboard keeps the dashboard and re
   await buttonsOf(env.get('dialogBody'), 'Sil')[0].click(); await settle();
   assert.equal(rows(env).length, 2);
   assert(visible(env, 'dashboard'));
+});
+
+// ---- Birimler: macOS gibi ondalık (GB) ve ölçülmeyen alan ----
+test('sizes use decimal units like macOS', () => {
+  const env = boot();
+  assert.equal(env.run('amount(999)').join('|'), '999|B');
+  assert.equal(env.run('amount(1000)').join('|'), '1,0|KB');
+  assert.equal(env.run('amount(1500000000)').join('|'), '1,50|GB');
+  assert.equal(env.run('format(245107195904)'), '245,11 GB');   // macOS: 245,11 GB
+  assert.equal(env.run('format(243220000000)'), '243,22 GB');   // macOS: 243,22 GB
+  assert.equal(env.run('format(108700000)'), '108,7 MB');        // macOS: 108,7 MB
+  assert.equal(env.run('format(46630000000)'), '46,63 GB');      // macOS: 46,63 GB
+});
+
+test('the measured card states how much of the used space was not measured', () => {
+  const env = boot();
+  env.run(`load(${JSON.stringify(makeReport({ disk: { total: 500e9, free: 100e9, used: 400e9 } }))})`);
+  const text = env.get('unmeasuredText').textContent;
+  assert(text.includes('390') && text.includes('GB') && text.includes('ölçülmedi') && text.includes('sistem'), text);
+  assert(!text.includes('GiB'));
+});
+
+test('the unmeasured note is empty when the disk numbers are unavailable', () => {
+  const env = boot();
+  env.run(`load(${JSON.stringify(makeReport({ disk: { total: 0, free: 0, used: 0 } }))})`);
+  assert.equal(env.get('unmeasuredText').textContent, '');
+});
+
+test('no binary units are shown anywhere in the UI text', () => {
+  const env = boot();
+  const stripped = env.html.replace(/<style[\s\S]*?<\/style>/g, '');
+  assert(!/\b(GiB|MiB|KiB|TiB)\b/.test(stripped), 'index.html mentions a binary unit');
+  assert(!/'(GiB|MiB|KiB|TiB|PiB)'|[0-9] (GiB|MiB|KiB)/.test(env.source), 'app.js mentions a binary unit');
 });

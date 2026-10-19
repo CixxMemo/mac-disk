@@ -200,3 +200,4 @@ Her mesaj `{id, type, payload}`. Swift her gelen mesajı doğrular; JS'e güveni
 3. Mevcut Python dosyaları **taşınmaz**, proje kökünde yerinde kalır. **Taşınmasın.**
 4. `git init` + `.gitignore` yapılır. `reports/`, üretilmiş `Disk-Atlas.html` (kişisel yollar içerir), `Disk-Atlas.onceki.html`, `*.app`, `.build/` git dışında kalır. **Evet.**
 5. Temizlik 5. aşamaya ertelenir; 1–4. aşamalar kendi Mac'inizde sağlam çalışana kadar eklenmez (kuzen testi yalnızca en sonda, nihai ürünle). **Evet.**
+6. Boyutlar macOS ile aynı **ondalık birimle (GB, 1 GB = 1.000.000.000 bayt)** gösterilir; GB ve üstü iki, KB/MB bir ondalıkla. "Ölçülen" kartı, kullanılan alandan ölçülemeyen kısmı (macOS sistem birimi, anlık görüntüler, korumalı alanlar) ayrıca yazar. (2026-10-19, kullanıcı isteği; Drive kopyası bu maddeyi içermez.)
