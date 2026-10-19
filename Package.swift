@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "DiskAtlasCore", targets: ["DiskAtlasCore"]),
     ],
     targets: [
-        .target(name: "DiskAtlasCore"),
+        .target(name: "DiskAtlasCore", resources: [.process("Resources")]),
         .testTarget(
             name: "DiskAtlasCoreTests",
             dependencies: ["DiskAtlasCore"],

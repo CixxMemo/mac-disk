@@ -1,0 +1,12 @@
+{
+  "stickyCategories": ["cache", "build", "dependencies", "models"],
+  "rules": [
+    {"category": "system", "appBundleUnder": "/applications/"},
+    {"category": "models", "pathContainsAny": ["/.lmstudio/models", "/.ollama/models", "/.cache/huggingface"]},
+    {"category": "dependencies", "nameIn": ["node_modules", ".venv", "venv", "bower_components"]},
+    {"category": "build", "nameIn": [".next", ".nuxt", ".svelte-kit", ".turbo", "__pycache__", "deriveddata"]},
+    {"category": "cache", "nameIn": [".cache", "_cacache", "caches", "cache", "gpucache", "code cache"]},
+    {"category": "system", "pathPrefixAny": ["/applications", "/library", "/system", "/usr", "/private", "/opt"]}
+  ],
+  "fallback": "personal"
+}

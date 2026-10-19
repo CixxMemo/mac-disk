@@ -3,7 +3,7 @@ public struct Node: Codable, Equatable, Sendable {
     public var path: String
     public var bytes: Int64
     public var logical: Int64
-    public var category: Category
+    public var category: DiskCategory
     public var aggregate: Bool?
     public var children: [Node]?
 }
@@ -13,7 +13,7 @@ public struct Candidate: Codable, Equatable, Sendable {
     public var path: String
     public var bytes: Int64
     public var logical: Int64
-    public var category: Category
+    public var category: DiskCategory
     public var label: String
     public var note: String
 }
