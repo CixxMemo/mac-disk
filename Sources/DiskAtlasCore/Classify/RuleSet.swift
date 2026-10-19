@@ -18,6 +18,11 @@ public struct RuleSet: Codable, Sendable {
         guard let url = Bundle.module.url(forResource: "rules", withExtension: "json") else {
             throw CocoaError(.fileNoSuchFile)
         }
-        return try JSONDecoder().decode(RuleSet.self, from: Data(contentsOf: url))
+        return try load(from: url)
+    }
+
+    /// Paketli `.app` içinde `Bundle.module` yerine dosya yolu verilerek kullanılır.
+    public static func load(from url: URL) throws -> RuleSet {
+        try JSONDecoder().decode(RuleSet.self, from: Data(contentsOf: url))
     }
 }
