@@ -60,6 +60,18 @@ final class DisplayEnvelopeTests: XCTestCase {
         XCTAssertEqual((findings[0]["bytes"] as? NSNumber)?.int64Value, 3 * gb)
     }
 
+    func testFindingsCarrySafetyAndScannerCandidatesAreReview() throws {
+        var base = try report(["/Users/me/a": 3 * gb, "/Users/me/b": 2 * gb])
+        base.candidates = [Candidate(name: ".next", path: "/Users/me/web/.next", bytes: 300 * mb, logical: 300 * mb,
+                                     category: .build, label: "Derleme", note: "aday notu")]
+        let object = try json(DisplayEnvelope(report: base, rules: try rules()))
+        let findings = try XCTUnwrap((object["ui"] as? [String: Any])?["findings"] as? [[String: Any]])
+        let safety = Dictionary(uniqueKeysWithValues: findings.map { ($0["path"] as! String, $0["safety"] as? String) })
+        XCTAssertEqual(safety["/Users/me/a"], "incele")
+        XCTAssertEqual(safety["/Users/me/b"], "güvenli")
+        XCTAssertEqual(safety["/Users/me/web/.next"], "incele", "tarayıcı adayı hiçbir zaman 'güvenli' sayılmaz")
+    }
+
     func testReportWithoutFolderIndexHasNoAppsOrUI() throws {
         let object = try json(DisplayEnvelope(report: try report(nil), rules: try rules()))
         XCTAssertNil(object["apps"])

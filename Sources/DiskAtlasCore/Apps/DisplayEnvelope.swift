@@ -10,6 +10,7 @@ public struct DisplayEnvelope: Encodable {
         public var category: String
         public var group: String
         public var note: String
+        public var safety: String
     }
 
     public struct UI: Encodable, Equatable {
@@ -39,7 +40,8 @@ public struct DisplayEnvelope: Encodable {
             for (path, bytes) in zip(component.paths, component.pathBytes) where bytes >= minFindingBytes {
                 let name = component.paths.count > 1 ? "\(component.name) · \(tail(path))" : component.name
                 findings.append(Finding(name: name, path: path, bytes: bytes, category: component.category.rawValue,
-                                        group: component.safety == .safe ? "cache" : "review", note: component.what))
+                                        group: component.safety == .safe ? "cache" : "review", note: component.what,
+                                        safety: component.safety.rawValue))
             }
         }
         let covered = findings.map(\.path)
@@ -47,7 +49,7 @@ public struct DisplayEnvelope: Encodable {
             if covered.contains(where: { candidate.path == $0 || candidate.path.hasPrefix($0 + "/") }) { continue }
             findings.append(Finding(name: candidate.name, path: candidate.path, bytes: candidate.bytes, category: candidate.category.rawValue,
                                     group: candidate.category == .cache || candidate.category == .build ? "cache" : "review",
-                                    note: candidate.note))
+                                    note: candidate.note, safety: Safety.review.rawValue))
         }
         findings.sort { $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.path < $1.path }
         return UI(homePath: apps.homePath, findings: Array(findings.prefix(maxFindings)))
