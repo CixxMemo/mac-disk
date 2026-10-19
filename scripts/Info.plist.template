@@ -5,6 +5,7 @@
     <key>CFBundleIdentifier</key><string>local.diskatlas.app</string>
     <key>CFBundleName</key><string>Disk Atlas</string>
     <key>CFBundleDisplayName</key><string>Disk Atlas</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleExecutable</key><string>DiskAtlas</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>{{VERSION}}</string>

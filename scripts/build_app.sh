@@ -15,6 +15,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/web"
 cp "$BIN" "$APP/Contents/MacOS/DiskAtlas"
 cp Resources/web/index.html Resources/web/app.css Resources/web/app.js "$APP/Contents/Resources/web/"
 cp Sources/DiskAtlasCore/Resources/rules.json "$APP/Contents/Resources/rules.json"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 sed "s/{{VERSION}}/$VERSION/g" scripts/Info.plist.template > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
