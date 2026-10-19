@@ -198,7 +198,7 @@ $('scanBtn').onclick = $('startScanBtn').onclick = startScan;
 $('cancelScanBtn').onclick = cancelScan;
 $('openSettingsBtn').onclick = $('openSettingsBanner').onclick = () => bridge?.request('openFullDiskAccess').catch(error => showMessage('Ayarlar açılamadı: ' + error.message));
 // ---- Geçmiş ve karşılaştırma ----
-let historyScans = [], picked = [], compareResult = null, compareFilterName = 'all';
+let historyScans = [], picked = [], compareResult = null, compareFilterName = 'all', directOnly = true, comparing = false;
 const dateLabel = value => new Date(value).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const signed = delta => (delta > 0 ? '+' : delta < 0 ? '−' : '') + format(Math.abs(delta));
 const filterNames = ['all', 'grew', 'shrank', 'newgone', 'uncertain'];
@@ -261,12 +261,18 @@ function confirmDelete(scan) {
   actions.append(cancel, confirm); body.append(actions);
 }
 async function runCompare() {
-  if (picked.length !== 2) return;
-  try { compareResult = await bridge.request('compare', { older: picked[0], newer: picked[1] }); }
-  catch (error) { compareResult = null; $('compareResult').classList.add('hidden'); showMessage('Karşılaştırılamadı: ' + error.message); return; }
-  $('message').classList.add('hidden'); compareFilterName = 'all'; $('compareSearch').value = '';
-  setFilterButtons();
-  $('compareResult').classList.remove('hidden'); drawCompare();
+  if (picked.length !== 2 || comparing) return;
+  const ids = [...picked];
+  comparing = true; $('compareBtn').disabled = true; $('compareBtn').textContent = 'Karşılaştırılıyor…';
+  let result = null, failure = null;
+  try { result = await bridge.request('compare', { older: ids[0], newer: ids[1] }); }
+  catch (error) { failure = error; }
+  comparing = false; $('compareBtn').textContent = 'Karşılaştır'; $('compareBtn').disabled = picked.length !== 2;
+  // Yanıt gelene kadar seçim değiştiyse veya tarama silindiyse sonuç gösterilmez.
+  if (!ids.every(id => picked.includes(id) && historyScans.some(scan => scan.id === id))) return;
+  if (failure) { compareResult = null; $('compareResult').classList.add('hidden'); showMessage('Karşılaştırılamadı: ' + failure.message); return; }
+  compareResult = result; compareFilterName = 'all'; directOnly = true; $('directOnlyBtn').setAttribute('aria-pressed', 'true'); $('compareSearch').value = '';
+  setFilterButtons(); $('compareResult').classList.remove('hidden'); drawCompare();
 }
 function drawCompare() {
   const { diff, olderCreated, newerCreated } = compareResult;
@@ -279,8 +285,9 @@ function drawCompare() {
   $('compareWarnings').replaceChildren(...diff.warnings.map(text => element('div', 'notice', text)));
   const query = $('compareSearch').value.trim().toLocaleLowerCase('tr-TR');
   const groups = { all: () => true, grew: i => i.status === 'grew', shrank: i => i.status === 'shrank', newgone: i => i.status === 'new' || i.status === 'gone', uncertain: i => i.status === 'uncertain' };
-  const shown = diff.items.filter(item => groups[compareFilterName](item) && item.path.toLocaleLowerCase('tr-TR').includes(query));
-  $('compareCount').textContent = shown.length + ' / ' + diff.totalItems + ' klasör';
+  const own = item => item.ownDelta ?? item.delta;
+  const shown = diff.items.filter(item => groups[compareFilterName](item) && (!directOnly || own(item) !== 0) && item.path.toLocaleLowerCase('tr-TR').includes(query));
+  $('compareCount').textContent = shown.length + ' / ' + diff.items.length + ' klasör' + (diff.totalItems > diff.items.length ? ' (en büyük ' + diff.items.length + ' / ' + diff.totalItems + ')' : '');
   $('compareBody').replaceChildren();
   for (const item of shown) {
     const row = element('tr');
@@ -294,6 +301,7 @@ function drawCompare() {
   if (!shown.length) { const row = element('tr'), cell = element('td', 'empty', 'Bu filtreyle eşleşen klasör yok.'); cell.colSpan = 5; row.append(cell); $('compareBody').append(row); }
 }
 $('compareBtn').onclick = runCompare;
+$('directOnlyBtn').onclick = () => { directOnly = !directOnly; $('directOnlyBtn').setAttribute('aria-pressed', String(directOnly)); if (compareResult) drawCompare(); };
 $('compareSearch').oninput = () => compareResult && drawCompare();
 filterNames.forEach(name => $('filter-' + name).onclick = () => { compareFilterName = name; setFilterButtons(); if (compareResult) drawCompare(); });
 window.diskAtlasReady = bridge ? bootNative() : Promise.resolve($('welcome').classList.remove('hidden'));

@@ -264,3 +264,55 @@ test('a compare error is shown', async () => {
   assert(visible(env, 'message') && env.get('message').textContent.includes('karşılaştırma için gerekli'));
   assert(!visible(env, 'compareResult'));
 });
+
+test('picking a third scan unchecks the oldest pick without redrawing the list', async () => {
+  const { env } = await historyEnv({ listScans: () => [...scans.slice(0, 2), { ...scans[0], id: 'scan-4', created: '2026-10-20T09:00:00.000000+00:00' }] });
+  const boxes = env.get('historyList').querySelectorAll('input');
+  check(env, 0); check(env, 1); check(env, 2);
+  assert.equal(env.get('historyList').querySelectorAll('input')[0], boxes[0], 'list was not redrawn');
+  assert(!boxes[0].checked && boxes[1].checked && boxes[2].checked);
+  assert(!env.get('compareBtn').disabled);
+});
+
+test('compare hides rows fully explained by their children by default and a toggle shows them', async () => {
+  const items = [
+    { path: '/Users/x', before: 5e9, after: 9e9, delta: 4e9, ownDelta: 0, status: 'grew' },
+    { path: '/Users/x/Library', before: 5e9, after: 9e9, delta: 4e9, ownDelta: 4e9, status: 'grew' }
+  ];
+  const { env } = await historyEnv({ compare: () => compareData(items) });
+  check(env, 0); check(env, 1);
+  await env.get('compareBtn').click(); await settle();
+  assert.equal(env.get('compareBody').children.length, 1);
+  assert(env.get('compareBody').children[0].textContent.includes('/Users/x/Library'));
+  await env.get('directOnlyBtn').click();
+  assert.equal(env.get('compareBody').children.length, 2);
+});
+
+test('compare disables the button while loading and drops a response whose selection changed', async () => {
+  let release;
+  const { env } = await historyEnv({ compare: () => new Promise(resolve => { release = () => resolve(compareData(sampleItems)); }) });
+  check(env, 0); check(env, 1);
+  const pending = env.get('compareBtn').click(); await settle();
+  assert(env.get('compareBtn').disabled && env.get('compareBtn').textContent.includes('Karşılaştırılıyor'));
+  check(env, 1, false);                       // seçim yolda değişti
+  release(); await pending; await settle();
+  assert(!visible(env, 'compareResult'), 'stale result must not be shown');
+  assert.equal(env.get('compareBtn').textContent, 'Karşılaştır');
+});
+
+test('comparing keeps the partial-scan notice of the dashboard', async () => {
+  const { env } = await historyEnv({ loadScan: () => makeReport({ incomplete: true }), compare: () => compareData(sampleItems) });
+  assert(visible(env, 'message'));
+  check(env, 0); check(env, 1);
+  await env.get('compareBtn').click(); await settle();
+  assert(visible(env, 'message') && env.get('message').textContent.includes('iptal'));
+});
+
+test('deleting the scan that is open in the dashboard keeps the dashboard and refreshes the list', async () => {
+  let list = scans;
+  const { env } = await historyEnv({ listScans: () => list, deleteScan: payload => { list = list.filter(s => s.id !== payload.id); return {}; } });
+  await buttonsOf(rows(env)[0], 'Sil')[0].click(); await settle();       // scan-3 = açık olan
+  await buttonsOf(env.get('dialogBody'), 'Sil')[0].click(); await settle();
+  assert.equal(rows(env).length, 2);
+  assert(visible(env, 'dashboard'));
+});

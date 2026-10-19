@@ -111,4 +111,49 @@ final class DifferTests: XCTestCase {
         XCTAssertThrowsError(try Differ.compare(older: good, newer: legacy)) { XCTAssertEqual($0 as? DiffError, .notComparable("newer")) }
         XCTAssertTrue(DiffError.notComparable("older").description.contains("karşılaştırma"))
     }
+
+    func testSubfoldersOfNewlyUnreadableFolderAreUncertainNotGone() throws {
+        let older = try report(["/Users/x/Library/Mail": 40 * mib, "/Users/x/Library/Mail/V10": 30 * mib,
+                                "/Users/x/Library/Mail/V10/INBOX": 20 * mib, "/Users/x/Other": 5 * mib])
+        let newer = try report(["/Users/x/Other": 9 * mib], unreadable: ["/Users/x/Library/Mail"])
+        let status = Dictionary(uniqueKeysWithValues: try Differ.compare(older: older, newer: newer).items.map { ($0.path, $0.status) })
+        for path in ["/Users/x/Library/Mail", "/Users/x/Library/Mail/V10", "/Users/x/Library/Mail/V10/INBOX"] {
+            XCTAssertEqual(status[path], .uncertain, path)
+        }
+        XCTAssertEqual(status["/Users/x/Other"], .grew)
+    }
+
+    func testSubfoldersOfFolderUnreadableInOlderScanAreUncertainNotNew() throws {
+        let older = try report(["/Users/x/Other": 5 * mib], unreadable: ["/Users/x/Library/Mail"])
+        let newer = try report(["/Users/x/Library/Mail/V10": 30 * mib, "/Users/x/Library/Mail/V10/INBOX": 20 * mib, "/Users/x/Other": 5 * mib])
+        let items = try Differ.compare(older: older, newer: newer).items
+        XCTAssertEqual(Set(items.map(\.path)), ["/Users/x/Library/Mail/V10", "/Users/x/Library/Mail/V10/INBOX"])
+        XCTAssertTrue(items.allSatisfy { $0.status == .uncertain })
+    }
+
+    func testDifferentScopesMakeEverythingUncertainWithWarning() throws {
+        let older = try report(["/": 900 * mib, "/Applications": 300 * mib, "/Users/x": 200 * mib], scope: "/")
+        let newer = try report(["/Users/x": 260 * mib], scope: "/Users/x")
+        let diff = try Differ.compare(older: older, newer: newer)
+        XCTAssertFalse(diff.items.isEmpty)
+        XCTAssertTrue(diff.items.allSatisfy { $0.status == .uncertain && $0.reason == "Kapsamlar farklı" })
+        XCTAssertTrue(diff.warnings.contains { $0.contains("kapsam") && $0.contains("güvenilir değil") })
+    }
+
+    func testIncompleteScanWarnsThatTotalsAreUnreliable() throws {
+        let diff = try Differ.compare(older: try report(["/a": mib]), newer: try report(["/a": 2 * mib], incomplete: true))
+        XCTAssertTrue(diff.warnings.contains { $0.contains("yarım") && $0.contains("güvenilir değil") }, "\(diff.warnings)")
+    }
+
+    func testOwnDeltaExcludesIndexedChildrenAndDrivesTheOrder() throws {
+        let older = try report(["/a": 5 * mib, "/a/b": 3 * mib, "/a/b/c": 3 * mib, "/z": 1 * mib])
+        let newer = try report(["/a": 15 * mib, "/a/b": 9 * mib, "/a/b/c": 9 * mib, "/z": 3 * mib])
+        let diff = try Differ.compare(older: older, newer: newer)
+        let own = Dictionary(uniqueKeysWithValues: diff.items.map { ($0.path, $0.ownDelta) })
+        XCTAssertEqual(own["/a"], 4 * mib)
+        XCTAssertEqual(own["/a/b"], 0)
+        XCTAssertEqual(own["/a/b/c"], 6 * mib)
+        XCTAssertEqual(own["/z"], 2 * mib)
+        XCTAssertEqual(diff.items.map(\.path), ["/a/b/c", "/a", "/z", "/a/b"])
+    }
 }
