@@ -45,7 +45,7 @@ function load(report){
  if(report.demo||report.incomplete||report.fullDiskAccess==='denied'){$('message').textContent=[report.demo?'Örnek veriler Mac’ine ait değildir.':'',report.incomplete?'Kısmi tarama: süre veya kayıt sınırı aşıldı ya da tarama iptal edildi.':'',report.fullDiskAccess==='denied'?'Tam Disk Erişimi olmadan yapıldı; korumalı klasörler ölçülmedi.':''].filter(Boolean).join(' ');$('message').classList.remove('hidden');}
  renderFindings();renderFiles();renderHealth();showView('explorer');
 }
-function showView(view){if(!['explorer','files','health'].includes(view))return;if(!data){showToast('Önce bir disk raporu aç.');return;}activeView=view;document.querySelectorAll('.view').forEach(node=>node.classList.toggle('hidden',node.id!=='view-'+view));document.querySelectorAll('.nav-btn').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});if(view==='explorer')requestAnimationFrame(renderMap);}
+function showView(view){if(!['explorer','files','health','history'].includes(view))return;if(!data){showToast('Önce bir disk raporu aç.');return;}activeView=view;document.querySelectorAll('.view').forEach(node=>node.classList.toggle('hidden',node.id!=='view-'+view));document.querySelectorAll('.nav-btn').forEach(button=>{const active=button.dataset.view===view;button.classList.toggle('active',active);if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});if(view==='explorer')requestAnimationFrame(renderMap);if(view==='history')renderHistory();}
 // Squarified treemap: build rows with nearly square rectangles rather than long strips.
 function squarify(items,x,y,width,height){
  const input=items.filter(item=>item.bytes>0).slice().sort((a,b)=>b.bytes-a.bytes);if(!input.length||width<=0||height<=0)return [];
@@ -184,7 +184,7 @@ function renderPermission(status) {
   updatePermissionBanner();
 }
 async function bootNative() {
-  $('scanBtn').classList.remove('hidden'); $('welcomeFile').classList.add('hidden'); $('welcomeNative').classList.remove('hidden');
+  $('scanBtn').classList.remove('hidden'); $('historyNav').classList.remove('hidden'); $('welcomeFile').classList.add('hidden'); $('welcomeNative').classList.remove('hidden');
   try { const info = await bridge.request('appInfo'); $('appInfoText').textContent = 'Disk Atlas ' + info.version + ' · macOS ' + info.macOS; } catch {}
   try { renderPermission((await bridge.request('permissionStatus')).status); } catch { renderPermission('unknown'); }
   let scans = [];
@@ -197,4 +197,100 @@ async function bootNative() {
 $('scanBtn').onclick = $('startScanBtn').onclick = startScan;
 $('cancelScanBtn').onclick = cancelScan;
 $('openSettingsBtn').onclick = $('openSettingsBanner').onclick = () => bridge?.request('openFullDiskAccess').catch(error => showMessage('Ayarlar açılamadı: ' + error.message));
+// ---- Geçmiş ve karşılaştırma ----
+let historyScans = [], picked = [], compareResult = null, compareFilterName = 'all';
+const dateLabel = value => new Date(value).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const signed = delta => (delta > 0 ? '+' : delta < 0 ? '−' : '') + format(Math.abs(delta));
+const filterNames = ['all', 'grew', 'shrank', 'newgone', 'uncertain'];
+const setFilterButtons = () => filterNames.forEach(name => $('filter-' + name).classList.toggle('active', name === compareFilterName));
+const statusLabels = { grew: 'Büyüdü', shrank: 'Küçüldü', new: 'Yeni / 1 MiB üstüne çıktı', gone: 'Kalktı / 1 MiB altına indi', uncertain: 'Belirsiz' };
+async function renderHistory() {
+  if (!bridge) return;
+  try { historyScans = await bridge.request('listScans'); }
+  catch (error) { showMessage('Geçmiş okunamadı: ' + error.message); return; }
+  picked = picked.filter(id => historyScans.some(scan => scan.id === id));
+  drawHistory();
+}
+function drawHistory() {
+  const list = $('historyList'); list.replaceChildren();
+  if (!historyScans.length) list.append(element('div', 'history-empty', 'Henüz kayıtlı tarama yok.'));
+  for (const scan of historyScans) {
+    const row = element('div', 'history-row');
+    const box = element('input'); box.type = 'checkbox'; box.checked = picked.includes(scan.id); box.disabled = scan.comparable === false;
+    box.setAttribute('aria-label', dateLabel(scan.created) + ' taramasını seç');
+    box.onchange = () => {
+      picked = picked.filter(id => id !== scan.id);
+      if (box.checked) picked.push(scan.id);
+      if (picked.length > 2) picked = picked.slice(-2);
+      drawHistory();
+    };
+    const main = element('div', 'history-main'), title = element('div', '', dateLabel(scan.created));
+    if (scan.incomplete) title.append(element('span', 'badge', 'Kısmi'));
+    if (scan.fullDiskAccess === 'denied') title.append(element('span', 'badge', 'İzinsiz'));
+    if (scan.comparable === false) title.append(element('span', 'badge', 'Karşılaştırılamaz (eski sürüm)'));
+    main.append(title, element('div', 'history-meta', format(scan.allocatedBytes) + ' ölçüldü · kapsam ' + scan.scope));
+    const open = element('button', 'text-button', 'Aç'), remove = element('button', 'text-button', 'Sil');
+    open.onclick = () => openScan(scan.id);
+    remove.onclick = () => confirmDelete(scan);
+    row.append(box, main, open, remove);
+    list.append(row);
+  }
+  $('compareBtn').disabled = picked.length !== 2;
+}
+async function openScan(id) {
+  try { await openSavedScan(id); showView('explorer'); }
+  catch (error) { showMessage('Tarama açılamadı: ' + error.message); }
+}
+function confirmDelete(scan) {
+  const body = openDialog('Taramayı sil', 'İŞLEM ONAYI');
+  body.append(element('p', '', dateLabel(scan.created) + ' tarihli tarama kaydı silinecek. Bu yalnızca Disk Atlas’ın kendi kaydıdır; Mac’indeki dosyalarına dokunulmaz.'));
+  const actions = element('div', 'dialog-actions'), cancel = element('button', 'button', 'Vazgeç'), confirm = element('button', 'button dark', 'Sil');
+  cancel.onclick = closeDialog;
+  confirm.onclick = async () => {
+    closeDialog();
+    try {
+      await bridge.request('deleteScan', { id: scan.id });
+      picked = picked.filter(id => id !== scan.id);
+      if (compareResult && (compareResult.olderId === scan.id || compareResult.newerId === scan.id)) { compareResult = null; $('compareResult').classList.add('hidden'); }
+      await renderHistory(); showToast('Tarama kaydı silindi.');
+    } catch (error) { showMessage('Tarama silinemedi: ' + error.message); }
+  };
+  actions.append(cancel, confirm); body.append(actions);
+}
+async function runCompare() {
+  if (picked.length !== 2) return;
+  try { compareResult = await bridge.request('compare', { older: picked[0], newer: picked[1] }); }
+  catch (error) { compareResult = null; $('compareResult').classList.add('hidden'); showMessage('Karşılaştırılamadı: ' + error.message); return; }
+  $('message').classList.add('hidden'); compareFilterName = 'all'; $('compareSearch').value = '';
+  setFilterButtons();
+  $('compareResult').classList.remove('hidden'); drawCompare();
+}
+function drawCompare() {
+  const { diff, olderCreated, newerCreated } = compareResult;
+  $('compareSubtitle').textContent = dateLabel(olderCreated) + ' → ' + dateLabel(newerCreated);
+  const card = (label, value, note) => { const stat = element('div', 'stat'); stat.append(element('div', 'stat-label', label), element('div', 'stat-value', signed(value)), element('div', 'stat-desc', note)); return stat; };
+  $('compareSummary').replaceChildren(
+    card('Ölçülen dosya farkı', diff.measuredDelta, 'İki taramada ölçülen toplam alan'),
+    card('Disk doluluk farkı', diff.diskUsedDelta, 'Diskin kullanılan alanındaki değişim'),
+    card('Açıklanamayan fark', diff.unexplained, 'Anlık görüntüler, korumalı alanlar ve taramalar arası değişimler'));
+  $('compareWarnings').replaceChildren(...diff.warnings.map(text => element('div', 'notice', text)));
+  const query = $('compareSearch').value.trim().toLocaleLowerCase('tr-TR');
+  const groups = { all: () => true, grew: i => i.status === 'grew', shrank: i => i.status === 'shrank', newgone: i => i.status === 'new' || i.status === 'gone', uncertain: i => i.status === 'uncertain' };
+  const shown = diff.items.filter(item => groups[compareFilterName](item) && item.path.toLocaleLowerCase('tr-TR').includes(query));
+  $('compareCount').textContent = shown.length + ' / ' + diff.totalItems + ' klasör';
+  $('compareBody').replaceChildren();
+  for (const item of shown) {
+    const row = element('tr');
+    const num = (text, cls) => element('td', 'num' + (cls ? ' ' + cls : ''), text);
+    const status = element('td', '', statusLabels[item.status] + (item.reason ? ' · ' + item.reason : ''));
+    const path = element('td', '', item.path); path.setAttribute('title', item.path);
+    row.append(path, num(item.before == null ? '—' : format(item.before)), num(item.after == null ? '—' : format(item.after)),
+               num(signed(item.delta), item.delta > 0 ? 'pos' : 'neg'), status);
+    $('compareBody').append(row);
+  }
+  if (!shown.length) { const row = element('tr'), cell = element('td', 'empty', 'Bu filtreyle eşleşen klasör yok.'); cell.colSpan = 5; row.append(cell); $('compareBody').append(row); }
+}
+$('compareBtn').onclick = runCompare;
+$('compareSearch').oninput = () => compareResult && drawCompare();
+filterNames.forEach(name => $('filter-' + name).onclick = () => { compareFilterName = name; setFilterButtons(); if (compareResult) drawCompare(); });
 window.diskAtlasReady = bridge ? bootNative() : Promise.resolve($('welcome').classList.remove('hidden'));

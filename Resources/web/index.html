@@ -24,7 +24,7 @@
 <div class="app">
 <header class="app-header">
  <div class="brand"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Disk Atlas</div>
- <nav class="navigation" aria-label="Ana gezinme"><button class="nav-btn active" data-view="explorer" aria-current="page">Keşfet</button><button class="nav-btn" data-view="files">Büyük dosyalar</button><button class="nav-btn" data-view="health">Tarama bilgisi</button></nav>
+ <nav class="navigation" aria-label="Ana gezinme"><button class="nav-btn active" data-view="explorer" aria-current="page">Keşfet</button><button class="nav-btn" data-view="files">Büyük dosyalar</button><button class="nav-btn hidden" id="historyNav" data-view="history">Geçmiş</button><button class="nav-btn" data-view="health">Tarama bilgisi</button></nav>
  <div class="header-end"><span class="read-only"><svg><use href="#i-shield"/></svg>Salt okunur</span><button class="button dark hidden" id="scanBtn">Tara</button><button class="button" id="importBtn"><svg><use href="#i-import"/></svg>Rapor aç</button></div>
 </header>
 <main class="main">
@@ -63,6 +63,17 @@
   </div>
  </section>
  <section id="view-files" class="view hidden"><div class="panel files-panel"><div class="panel-top"><div><h2 class="panel-title">Büyük dosyalar</h2><p class="panel-subtitle">Ölçümdeki en büyük 150 dosya. Fiziksel ve mantıksal boyutu karşılaştır.</p></div><span id="fileCount" class="count-pill"></span></div><div class="searchbar files-search"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="fileSearch" type="search" placeholder="Dosya adı veya konum ara…" aria-label="Büyük dosyalarda ara"></div><div class="table-scroll"><table class="files-table"><thead><tr><th scope="col">DOSYA / KONUM</th><th scope="col">TÜR</th><th scope="col">MANTIKSAL</th><th scope="col">AYRILAN ALAN</th></tr></thead><tbody id="filesBody"></tbody></table></div></div></section>
+ <section id="view-history" class="view hidden">
+  <div class="panel history-panel"><div class="panel-top"><div><h2 class="panel-title">Tarama geçmişi</h2><p class="panel-subtitle">İki tarama seç ve karşılaştır. Kayıtlar yalnızca bu Mac’te durur.</p></div><button class="button dark" id="compareBtn" disabled>Karşılaştır</button></div><div id="historyList" class="history-list"></div></div>
+  <div id="compareResult" class="panel compare-panel hidden">
+   <div class="panel-top"><div><h2 class="panel-title">Karşılaştırma</h2><p class="panel-subtitle" id="compareSubtitle"></p></div><span id="compareCount" class="count-pill"></span></div>
+   <div id="compareSummary" class="stats compare-stats"></div>
+   <div id="compareWarnings" class="compare-warnings"></div>
+   <div class="compare-tools"><div id="compareFilter" class="segmented" aria-label="Durum filtresi"><button id="filter-all" class="active" data-filter="all">Hepsi</button><button id="filter-grew" data-filter="grew">Büyüyenler</button><button id="filter-shrank" data-filter="shrank">Küçülenler</button><button id="filter-newgone" data-filter="newgone">Yeni / Kalkan</button><button id="filter-uncertain" data-filter="uncertain">Belirsiz</button></div><div class="searchbar"><svg aria-hidden="true"><use href="#i-search"/></svg><input id="compareSearch" type="search" placeholder="Klasör ara…" aria-label="Karşılaştırmada ara"></div></div>
+   <div class="table-scroll"><table class="files-table compare-table"><thead><tr><th scope="col">KLASÖR</th><th scope="col">ÖNCE</th><th scope="col">SONRA</th><th scope="col">FARK</th><th scope="col">DURUM</th></tr></thead><tbody id="compareBody"></tbody></table></div>
+   <p class="footnote compare-note">Yalnızca 1 MiB ve üstü klasörler karşılaştırılır. “Yeni” bir klasörün eşiği geçtiğini, “Kalktı” ise silindiğini ya da eşiğin altına indiğini gösterebilir. Okunamayan klasörler ve yarım taramalar “Belirsiz” sayılır; bunlar asla “silindi” diye gösterilmez.</p>
+  </div>
+ </section>
  <section id="view-health" class="view hidden"><div class="health-layout"><section class="panel health-panel"><h2>Ölçümün sınırlarını bil.</h2><p id="healthSummary"></p><div id="healthMetrics" class="health-metrics"></div><p id="appInfoText" class="footnote"></p></section><section class="panel health-panel"><h2>Görünen alan, bütün disk değildir.</h2><ul class="limits"><li>Dosya içerikleri açılmadı; yalnızca ad, yol ve boyut metaverileri ölçüldü.</li><li>Sembolik bağlantılar ve farklı disk birimleri izlenmedi. Bulut dosyaları indirilmedi.</li><li>Korumalı alanlar ve APFS anlık görüntüleri kapsam dışındadır.</li><li>Sabit bağlantılar bir kez sayıldı. APFS klonlarının ortak blokları tekrar sayılabilir.</li><li>Önbellek ve diğer türler dosya yoluna göre tahmindir. Gereksizlik veya kesin kazanım doğrulanmadı.</li><li>GiB = 1.073.741.824 bayt. Kullanılabilir alan tarama anının ölçümüdür.</li></ul><div id="errorList" class="error-list"></div></section></div></section>
  </div>
  <footer class="app-footer"><span class="footer-status"><i class="status-dot"></i>Yalnızca gözlem. Silme, taşıma veya temizlik işlemi yok.</span><div class="footer-actions"><button id="coverageBtn">Tarama kapsamı</button><button id="helpBtn">Nasıl çalışır?</button></div></footer>
